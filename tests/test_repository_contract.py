@@ -1,5 +1,9 @@
 import json
 import re
+import shutil
+import subprocess
+import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -8,6 +12,124 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class RepositoryContractTests(unittest.TestCase):
+    def run_validator(self, root: Path) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            [sys.executable, "-X", "utf8", "scripts/validate.py"],
+            cwd=root,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+    def copied_repository(self) -> tuple[tempfile.TemporaryDirectory[str], Path]:
+        temporary = tempfile.TemporaryDirectory()
+        copied_root = Path(temporary.name) / "repository"
+        shutil.copytree(
+            ROOT,
+            copied_root,
+            ignore=shutil.ignore_patterns(".git", "__pycache__", "*.pyc"),
+        )
+        return temporary, copied_root
+
+    def assert_validator_rejects(self, root: Path, expected: str) -> None:
+        result = self.run_validator(root)
+        self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn(expected, result.stdout + result.stderr)
+
+    def test_validator_cli_passes(self) -> None:
+        result = self.run_validator(ROOT)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("[OK] repository validation passed", result.stdout)
+
+    def test_validator_rejects_invalid_version_and_eval_schema(self) -> None:
+        cases: list[tuple[str, object, str]] = [
+            ("invalid semver", lambda root: (root / "VERSION").write_text("0.1\n", encoding="utf-8"), "VERSION"),
+            ("fewer than five evals", lambda root: (root / "evals/cases.json").write_text("[]\n", encoding="utf-8"), "at least five"),
+            ("missing eval field", self.remove_eval_field, "exactly"),
+        ]
+        for name, mutate, expected in cases:
+            with self.subTest(name=name):
+                temporary, copied_root = self.copied_repository()
+                with temporary:
+                    mutate(copied_root)
+                    self.assert_validator_rejects(copied_root, expected)
+
+    def remove_eval_field(self, root: Path) -> None:
+        cases = json.loads((root / "evals/cases.json").read_text(encoding="utf-8"))
+        del cases[0]["stage"]
+        (root / "evals/cases.json").write_text(
+            json.dumps(cases), encoding="utf-8"
+        )
+
+    def test_validator_rejects_contract_and_encoding_defects(self) -> None:
+        cases: list[tuple[str, object, str]] = [
+            (
+                "wrong frontmatter",
+                lambda root: (root / "SKILL.md").write_text(
+                    (root / "SKILL.md").read_text(encoding="utf-8").replace(
+                        "name: interview-solo-business-startup-positioning",
+                        "name: incorrect-skill-name",
+                        1,
+                    ),
+                    encoding="utf-8",
+                ),
+                "frontmatter",
+            ),
+            (
+                "missing interview guide link",
+                lambda root: (root / "SKILL.md").write_text(
+                    (root / "SKILL.md").read_text(encoding="utf-8").replace(
+                        "`references/interview-guide.md`", "interview guide"
+                    ),
+                    encoding="utf-8",
+                ),
+                "interview-guide",
+            ),
+            (
+                "missing output contract link",
+                lambda root: (root / "SKILL.md").write_text(
+                    (root / "SKILL.md").read_text(encoding="utf-8").replace(
+                        "`references/output-contract.md`", "output contract"
+                    ),
+                    encoding="utf-8",
+                ),
+                "output-contract",
+            ),
+            (
+                "invalid utf8",
+                lambda root: (root / "README.md").write_bytes(b"\xff\xfe"),
+                "UTF-8",
+            ),
+        ]
+        for name, mutate, expected in cases:
+            with self.subTest(name=name):
+                temporary, copied_root = self.copied_repository()
+                with temporary:
+                    mutate(copied_root)
+                    self.assert_validator_rejects(copied_root, expected)
+
+    def test_validator_detects_private_paths_and_tokens(self) -> None:
+        cases = [
+            ("windows home", "C:" + r"\Users\Ada\secret.txt", "Windows home path"),
+            ("unix home", "/" + "home/ada/secret.txt", "Unix home path"),
+            ("project path", "D:" + r"\codex\project\private.txt", "local project path"),
+            ("private key", "-----BEGIN " + "PRIVATE KEY-----", "private-key header"),
+            ("github token", "gh" + "p_abcdefghijklmnopqrstuvwxyz1234567890ABCD", "GitHub token"),
+            ("embedded secret", "api_" + "key = 'super-secret-value'", "embedded secret"),
+        ]
+        for name, secret, expected in cases:
+            with self.subTest(name=name):
+                temporary, copied_root = self.copied_repository()
+                with temporary:
+                    (copied_root / "README.md").write_text(
+                        (copied_root / "README.md").read_text(encoding="utf-8")
+                        + "\n"
+                        + secret
+                        + "\n",
+                        encoding="utf-8",
+                    )
+                    self.assert_validator_rejects(copied_root, expected)
+
     def test_public_project_files_exist(self) -> None:
         required = {
             "README.md", "README.zh-CN.md", "CHANGELOG.md",
