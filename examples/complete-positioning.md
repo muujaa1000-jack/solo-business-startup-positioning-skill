@@ -1,8 +1,8 @@
 # Fictional complete positioning example
 
-This is a fictional composite example. Names, situations, and evidence are
-invented for documentation; they do not describe a real person, business,
-customer, or market result.
+This is a public-safe fictional composite example. Names, situations, and
+evidence are invented for documentation; they do not describe a real person,
+business, customer, or market result.
 
 ## Interview snapshots
 

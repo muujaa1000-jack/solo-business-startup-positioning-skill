@@ -1,4 +1,5 @@
 import json
+import re
 import unittest
 from pathlib import Path
 
@@ -30,18 +31,38 @@ class RepositoryContractTests(unittest.TestCase):
     def test_readmes_cover_same_public_contract(self) -> None:
         english = (ROOT / "README.md").read_text(encoding="utf-8")
         chinese = (ROOT / "README.zh-CN.md").read_text(encoding="utf-8")
-        for phrase in (
-            "## Install", "## Compatibility and verification",
-            "## Develop and release", "solo-business-validation-skill",
-        ):
-            self.assertIn(phrase, english)
-        for phrase in (
-            "## 安装", "## 兼容性与验证边界",
-            "## 开发与发布", "solo-business-validation-skill",
-        ):
-            self.assertIn(phrase, chinese)
+        self.assertEqual(
+            [
+                "## Who it is for",
+                "## Install",
+                "## Start an interview",
+                "## What the interview produces",
+                "## Commercialization validator",
+                "## Compatibility and verification",
+                "## Evidence boundaries",
+                "## Develop and release",
+                "## License",
+            ],
+            re.findall(r"^## .+$", english, re.MULTILINE),
+        )
+        self.assertEqual(
+            [
+                "## 适合谁",
+                "## 安装",
+                "## 开始访谈",
+                "## 访谈会产出什么",
+                "## 商业化验证器",
+                "## 兼容性与验证边界",
+                "## 证据边界",
+                "## 开发与发布",
+                "## 许可证",
+            ],
+            re.findall(r"^## .+$", chinese, re.MULTILINE),
+        )
+        self.assertIn("solo-business-validation-skill", english)
+        self.assertIn("solo-business-validation-skill", chinese)
 
-    def test_examples_are_bounded_and_fictional(self) -> None:
+    def test_examples_are_explicitly_fictional_and_public_safe(self) -> None:
         complete = (ROOT / "examples/complete-positioning.md").read_text(
             encoding="utf-8"
         )
@@ -49,8 +70,65 @@ class RepositoryContractTests(unittest.TestCase):
             ROOT / "examples/insufficient-evidence.zh-CN.md"
         ).read_text(encoding="utf-8")
         self.assertIn("fictional", complete.lower())
+        self.assertIn("public-safe", complete.lower())
+        self.assertIn("虚构", insufficient)
+        self.assertIn("公开安全", insufficient)
         self.assertIn("待验证假设", insufficient)
         self.assertIn("不等于市场已验证", complete + insufficient)
+
+    def test_insufficient_evidence_example_preserves_turn_boundaries(self) -> None:
+        insufficient = (
+            ROOT / "examples/insufficient-evidence.zh-CN.md"
+        ).read_text(encoding="utf-8")
+        first_turn = re.search(
+            r"\*\*Skill 合规回复：\*\*\s*(.*?)\n\n这是首轮",
+            insufficient,
+            re.DOTALL,
+        )
+        self.assertIsNotNone(first_turn)
+        self.assertEqual(
+            "你现在是完全没有方向，还是方向太多难以选择？",
+            first_turn.group(1).strip(),
+        )
+        for phrase in (
+            "阶段性定位假设",
+            "现有依据",
+            "最大缺口",
+            "最值得补充的一项信息",
+            "不生成候选比较、使用者选择、完整定位组合或商业验证交接卡",
+        ):
+            self.assertIn(phrase, insufficient)
+
+    def test_complete_example_has_choice_seven_sections_and_handoff(self) -> None:
+        complete = (ROOT / "examples/complete-positioning.md").read_text(
+            encoding="utf-8"
+        )
+        candidates = complete.split("After one question per turn", 1)[1].split(
+            "The participant explicitly chooses", 1
+        )[0]
+        candidate_rows = [
+            line for line in candidates.splitlines()
+            if line.startswith("| ")
+            and not line.startswith("| Candidate |")
+            and not line.startswith("|---")
+        ]
+        self.assertGreaterEqual(len(candidate_rows), 2)
+        self.assertLessEqual(len(candidate_rows), 3)
+        self.assertIn("The participant explicitly chooses", complete)
+        self.assertEqual(
+            [
+                "### 当前访谈结论",
+                "### 创始人底盘",
+                "### 机会线索",
+                "### 候选定位比较",
+                "### 使用者选择",
+                "### 完整定位组合",
+                "### 商业验证交接卡",
+            ],
+            re.findall(r"^### .+$", complete, re.MULTILINE),
+        )
+        self.assertIn("solo-business-validation-skill", complete)
+        self.assertIn("does not equal market validation", complete)
 
     def test_eval_schema_and_cases(self) -> None:
         cases = json.loads((ROOT / "evals/cases.json").read_text(encoding="utf-8"))

@@ -8,9 +8,10 @@ It uses a one-question-at-a-time interview to turn lived experience,
 capabilities, resources, interests, constraints, and reachable people into two
 or three positioning hypotheses. It does not replace commercial validation.
 
-The Chinese mirror, [README.zh-CN.md](README.zh-CN.md), preserves the original
-user-facing terms `适合谁`, `如何开始`, `会得到什么`, and `能力边界`. Its core
-interview rule is `一次只问一个问题`, and its next stage is `商业化验证`.
+The Chinese mirror, [README.zh-CN.md](README.zh-CN.md), covers the same
+user-facing scope, including guidance corresponding to `适合谁`, `如何开始`,
+`会得到什么`, and `能力边界`. Its core interview rule is `一次只问一个问题`,
+and its next stage is `商业化验证`.
 
 ## Who it is for
 
