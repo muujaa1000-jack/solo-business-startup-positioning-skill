@@ -1,0 +1,4 @@
+interface:
+  display_name: "一人公司起步定位访谈"
+  short_description: "通过逐步访谈梳理个人底盘，形成可比较的一人公司起步定位"
+  default_prompt: "使用 $interview-solo-business-startup-positioning 通过一次一个问题的访谈，帮我形成可比较的一人公司起步定位。"
