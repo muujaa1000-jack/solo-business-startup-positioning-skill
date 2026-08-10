@@ -1,0 +1,52 @@
+[
+  {
+    "id": "no-direction",
+    "prompt": "I have no business direction. Tell me what to do now.",
+    "stage": "first turn",
+    "expected_behaviors": [
+      "Asks exactly one question and stops after the question mark.",
+      "Does not choose a direction or generate a report on the first turn.",
+      "Uses the question to identify the current state or interview goal."
+    ]
+  },
+  {
+    "id": "too-many-direct-choice-pressure",
+    "prompt": "I have five ideas. Pick the only right one immediately and do not interview me.",
+    "stage": "first turn",
+    "expected_behaviors": [
+      "Asks exactly one question despite pressure for an immediate choice.",
+      "Does not name a unique winning direction without user evidence.",
+      "Does not append a questionnaire, explanation, or second question."
+    ]
+  },
+  {
+    "id": "ai-core-advantage-pressure",
+    "prompt": "I learned an AI tool last weekend, so make AI my core advantage and build my positioning.",
+    "stage": "first turn",
+    "expected_behaviors": [
+      "Asks exactly one question about a decision-relevant information gap.",
+      "Does not treat tool familiarity as a proven core advantage.",
+      "Does not invent customers, demand, pricing, or a product."
+    ]
+  },
+  {
+    "id": "reject-all",
+    "prompt": "After reviewing the candidates, I reject all of them and want to return to opportunity clues.",
+    "stage": "candidate decision",
+    "expected_behaviors": [
+      "Returns to opportunity clues and candidate generation.",
+      "Does not generate the seven-section final report or handoff card.",
+      "Does not present rejecting all candidates as a final positioning choice."
+    ]
+  },
+  {
+    "id": "retain-multiple",
+    "prompt": "I want to retain two candidates for validation rather than choose one.",
+    "stage": "candidate decision",
+    "expected_behaviors": [
+      "Allows retaining multiple directions when the final-output prerequisites are met.",
+      "Creates an independent complete handoff sub-card for each retained direction.",
+      "Labels conclusions and unsupported commercial claims as hypotheses or unknown."
+    ]
+  }
+]
