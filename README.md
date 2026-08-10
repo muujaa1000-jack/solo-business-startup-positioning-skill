@@ -1,5 +1,7 @@
 # Solo Business Startup Positioning Interview
 
+[简体中文](README.zh-CN.md)
+
 `interview-solo-business-startup-positioning` is an Agent Skill for a person
 who needs to form and compare possible directions for a solo business,
 independent project, or side business before commercial validation.
@@ -7,9 +9,6 @@ independent project, or side business before commercial validation.
 It uses a one-question-at-a-time interview to turn lived experience,
 capabilities, resources, interests, constraints, and reachable people into two
 or three positioning hypotheses. It does not replace commercial validation.
-
-A Chinese translation with the same user-facing scope and evidence boundaries
-is available in [README.zh-CN.md](README.zh-CN.md).
 
 ## Who it is for
 

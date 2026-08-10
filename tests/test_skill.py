@@ -296,7 +296,9 @@ class SoloBusinessStartupPositioningSkillTests(unittest.TestCase):
         self.assertIn("商业化验证", chinese)
         self.assertIn("one-question-at-a-time", english)
         self.assertIn("commercial validation", english)
-        self.assertNotRegex(english, r"[\u3400-\u9fff]")
+        language_link = "[简体中文](README.zh-CN.md)"
+        self.assertIn(language_link, english)
+        self.assertNotRegex(english.replace(language_link, ""), r"[\u3400-\u9fff]")
 
     def test_skill_does_not_force_a_business_format_or_external_action(self) -> None:
         text = self.read("SKILL.md")

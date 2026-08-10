@@ -548,8 +548,14 @@ class RepositoryContractTests(unittest.TestCase):
     def test_readmes_cover_same_public_contract(self) -> None:
         english = (ROOT / "README.md").read_text(encoding="utf-8")
         chinese = (ROOT / "README.zh-CN.md").read_text(encoding="utf-8")
-        self.assertNotRegex(english, r"[\u3400-\u9fff]")
-        self.assertIn("[README.zh-CN.md](README.zh-CN.md)", english)
+        language_link = "[简体中文](README.zh-CN.md)"
+        self.assertTrue(
+            english.startswith(
+                "# Solo Business Startup Positioning Interview\n\n"
+                f"{language_link}\n\n"
+            )
+        )
+        self.assertNotRegex(english.replace(language_link, ""), r"[\u3400-\u9fff]")
         self.assertEqual(
             [
                 "## Who it is for",
