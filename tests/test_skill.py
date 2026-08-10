@@ -288,11 +288,15 @@ class SoloBusinessStartupPositioningSkillTests(unittest.TestCase):
             self.assertIn(phrase, text)
 
     def test_readme_is_user_facing_and_separates_validation(self) -> None:
-        text = self.read("README.md")
-        for phrase in ("适合谁", "如何开始", "会得到什么", "能力边界"):
-            self.assertIn(phrase, text)
-        self.assertIn("一次只问一个问题", text)
-        self.assertIn("商业化验证", text)
+        english = self.read("README.md")
+        chinese = self.read("README.zh-CN.md")
+        for phrase in ("适合谁", "开始访谈", "访谈会产出什么", "证据边界"):
+            self.assertIn(phrase, chinese)
+        self.assertIn("一次只问一个问题", chinese)
+        self.assertIn("商业化验证", chinese)
+        self.assertIn("one-question-at-a-time", english)
+        self.assertIn("commercial validation", english)
+        self.assertNotRegex(english, r"[\u3400-\u9fff]")
 
     def test_skill_does_not_force_a_business_format_or_external_action(self) -> None:
         text = self.read("SKILL.md")

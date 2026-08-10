@@ -8,10 +8,8 @@ It uses a one-question-at-a-time interview to turn lived experience,
 capabilities, resources, interests, constraints, and reachable people into two
 or three positioning hypotheses. It does not replace commercial validation.
 
-The Chinese mirror, [README.zh-CN.md](README.zh-CN.md), covers the same
-user-facing scope, including guidance corresponding to `适合谁`, `如何开始`,
-`会得到什么`, and `能力边界`. Its core interview rule is `一次只问一个问题`,
-and its next stage is `商业化验证`.
+A Chinese translation with the same user-facing scope and evidence boundaries
+is available in [README.zh-CN.md](README.zh-CN.md).
 
 ## Who it is for
 
@@ -64,8 +62,8 @@ evaluation specifications, not proof of model behavior.
 
 ## Commercialization validator
 
-The handoff card is a `待验证假设` (hypothesis to validate), not proof of a
-market. Pass it to [solo-business-validation-skill](https://github.com/muujaa1000-jack/solo-business-validation-skill)
+The handoff card is a hypothesis to validate, not proof of a market. Pass it to
+[solo-business-validation-skill](https://github.com/muujaa1000-jack/solo-business-validation-skill)
 to test demand, payment, acquisition, and delivery economics. This Skill does
 not approve full development, outreach, publication, charging, or spending.
 
@@ -93,10 +91,11 @@ not prove multi-turn stability, cross-model behavior, or commercial outcomes.
 
 ## Evidence boundaries
 
-The five information states are `材料已核实`, `用户陈述`, `外部推断`,
-`待验证假设`, and `未知`. The Skill must not invent customers, market demand,
-prices, channels, results, or personal advantages. A completed positioning
-interview is not market validation and does not promise income or fit.
+The five information states are verified material, user statement, external
+inference, hypothesis to validate, and unknown. The Skill must not invent
+customers, market demand, prices, channels, results, or personal advantages. A
+completed positioning interview is not market validation and does not promise
+income or fit.
 
 ## Develop and release
 
