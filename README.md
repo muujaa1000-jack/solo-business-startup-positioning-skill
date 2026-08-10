@@ -116,11 +116,15 @@ python -X utf8 scripts/verify_artifacts.py dist/interview-solo-business-startup-
 
 ### Release artifacts
 
-The `v0.1.0` Release contains exactly these three assets:
+The release workflow is configured to publish exactly these three assets for
+`v0.1.0`:
 
 - `interview-solo-business-startup-positioning-0.1.0.zip`
 - `interview-solo-business-startup-positioning-0.1.0.skill`
 - `SHA256SUMS`
+
+Do not describe the Release as complete until the remote GitHub Release and
+all three downloaded assets have been verified.
 
 ## License
 

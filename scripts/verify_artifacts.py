@@ -21,6 +21,9 @@ except ModuleNotFoundError:
     )
 
 
+_READ_CHUNK_SIZE = 64 * 1024
+
+
 def expected_members() -> list[str]:
     return [
         f"{SKILL_NAME}/{Path(item).as_posix()}" for item in sorted(RUNTIME_FILES)
@@ -56,8 +59,8 @@ def _verify_checksums(zip_path: Path, skill_path: Path) -> list[str]:
     if not sums_path.is_file():
         return ["SHA256SUMS: required checksum manifest is missing"]
     try:
-        digest = hashlib.sha256(zip_path.read_bytes()).hexdigest()
-        skill_digest = hashlib.sha256(skill_path.read_bytes()).hexdigest()
+        digest = _sha256_file(zip_path)
+        skill_digest = _sha256_file(skill_path)
         actual = sums_path.read_bytes()
     except OSError as error:
         return [f"SHA256SUMS: cannot be read ({error})"]
@@ -69,10 +72,43 @@ def _verify_checksums(zip_path: Path, skill_path: Path) -> list[str]:
     return []
 
 
-def _canonical_archive_bytes(root: Path) -> bytes:
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        while chunk := stream.read(_READ_CHUNK_SIZE):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _files_are_byte_identical(left: Path, right: Path) -> bool:
+    if left.stat().st_size != right.stat().st_size:
+        return False
+    with left.open("rb") as left_stream, right.open("rb") as right_stream:
+        while True:
+            left_chunk = left_stream.read(_READ_CHUNK_SIZE)
+            right_chunk = right_stream.read(_READ_CHUNK_SIZE)
+            if left_chunk != right_chunk:
+                return False
+            if not left_chunk:
+                return True
+
+
+def _verify_canonical_archive(root: Path, artifact: Path) -> tuple[list[str], bool]:
+    """Compare safely with a fresh build and say whether content inspection is bounded."""
     with tempfile.TemporaryDirectory() as directory:
-        zip_path, _, _ = build(root, Path(directory))
-        return zip_path.read_bytes()
+        canonical_path, _, _ = build(root, Path(directory))
+        canonical_size = canonical_path.stat().st_size
+        artifact_size = artifact.stat().st_size
+        if artifact_size != canonical_size:
+            finding = (
+                "artifact canonical bytes: canonical size is "
+                f"{canonical_size} bytes, got {artifact_size}"
+            )
+            inspection_limit = max(canonical_size * 2, canonical_size + 1_000_000)
+            return [finding], artifact_size <= inspection_limit
+        if not _files_are_byte_identical(artifact, canonical_path):
+            return ["artifact canonical bytes: must exactly match a fresh source build"], True
+        return [], True
 
 
 def verify(root: Path, artifact: Path) -> list[str]:
@@ -89,18 +125,18 @@ def verify(root: Path, artifact: Path) -> list[str]:
     if not artifact.is_file():
         return [*findings, f"{artifact}: artifact is missing"]
     try:
-        canonical = _canonical_archive_bytes(root)
-        if artifact.read_bytes() != canonical:
-            findings.append(
-                "artifact canonical bytes: must exactly match a fresh source build"
-            )
+        canonical_findings, safe_to_inspect = _verify_canonical_archive(root, artifact)
+        findings.extend(canonical_findings)
     except (OSError, ValueError) as error:
         findings.append(f"artifact canonical bytes: cannot regenerate ({error})")
+        safe_to_inspect = False
+    if not safe_to_inspect:
+        return findings
     if not zip_path.is_file() or not skill_path.is_file():
         findings.append("release pair: both versioned ZIP and .skill files are required")
     else:
         try:
-            if zip_path.read_bytes() != skill_path.read_bytes():
+            if not _files_are_byte_identical(zip_path, skill_path):
                 findings.append("release pair: ZIP and .skill must be byte-identical")
         except OSError as error:
             findings.append(f"release pair: cannot read artifact bytes ({error})")

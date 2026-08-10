@@ -386,6 +386,34 @@ class RepositoryContractTests(unittest.TestCase):
             self.assertIn("outside repository root", findings)
             self.assertNotIn("UTF-8", findings)
 
+    def test_validator_returns_findings_for_symlink_resolution_loops(self) -> None:
+        from scripts.validate import validate_repository
+
+        for relative in ("README.md", "docs/looped-public.md"):
+            with self.subTest(path=relative):
+                temporary, copied_root = self.copied_repository()
+                with temporary:
+                    target = copied_root / relative
+                    if not target.exists():
+                        target.write_text("loop stand-in\n", encoding="utf-8")
+                    original_resolve = Path.resolve
+                    with mock.patch.object(
+                        Path,
+                        "resolve",
+                        autospec=True,
+                        side_effect=lambda path, *args, **kwargs: (
+                            (_ for _ in ()).throw(RuntimeError("Symlink loop"))
+                            if path == target
+                            else original_resolve(path, *args, **kwargs)
+                        ),
+                    ):
+                        try:
+                            findings = "\n".join(validate_repository(copied_root))
+                        except RuntimeError as error:
+                            self.fail(f"RuntimeError escaped instead of a finding: {error}")
+                    self.assertIn(relative, findings)
+                    self.assertIn("cannot be resolved", findings)
+
     def test_validator_detects_root_tilde_and_unquoted_secrets(self) -> None:
         cases = [
             ("root home", "/" + "root/private.txt", "Unix home path"),
@@ -421,6 +449,45 @@ class RepositoryContractTests(unittest.TestCase):
         self.assertEqual([], scan_text("docs/example.md", safe_examples))
         result = self.run_validator(ROOT)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_validator_detects_prefixed_secret_variable_assignments(self) -> None:
+        assignments = (
+            "OPENAI_" + "API_" + "KEY" + "=" + "live-openai-value-12345",
+            "CLIENT_" + "SEC" + "RET" + "='" + "live-client-value-12345'",
+            "AWS_" + "SECRET_ACCESS_" + "KEY" + "=" + "live-aws-value-12345",
+            "ACCESS_" + "TOK" + "EN" + ": " + "live-access-value-12345",
+        )
+        for assignment in assignments:
+            with self.subTest(variable=assignment.split("=", 1)[0]):
+                temporary, copied_root = self.copied_repository()
+                with temporary:
+                    readme = copied_root / "README.md"
+                    readme.write_text(
+                        readme.read_text(encoding="utf-8") + "\n" + assignment,
+                        encoding="utf-8",
+                    )
+                    self.assert_validator_rejects(copied_root, "embedded secret")
+
+    def test_validator_allows_unassigned_secret_variable_names(self) -> None:
+        temporary, copied_root = self.copied_repository()
+        with temporary:
+            variable_names = " ".join(
+                (
+                    "OPENAI_" + "API_KEY",
+                    "CLIENT_" + "SECRET",
+                    "AWS_" + "SECRET_ACCESS_KEY",
+                    "ACCESS_" + "TOKEN",
+                )
+            )
+            readme = copied_root / "README.md"
+            readme.write_text(
+                readme.read_text(encoding="utf-8")
+                + "\nConfigure these environment variable names: "
+                + variable_names,
+                encoding="utf-8",
+            )
+            result = self.run_validator(copied_root)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_validator_detects_private_paths_and_tokens(self) -> None:
         cases = [
@@ -549,6 +616,22 @@ class RepositoryContractTests(unittest.TestCase):
 
         self.assertIn("not a claim of live installation", english)
         self.assertIn("不等于已声明某个宿主或版本安装成功", chinese)
+
+    def test_readmes_describe_release_as_configured_until_remote_verification(self) -> None:
+        english = (ROOT / "README.md").read_text(encoding="utf-8")
+        chinese = (ROOT / "README.zh-CN.md").read_text(encoding="utf-8")
+        self.assertIn(
+            "The release workflow is configured to publish exactly these three assets",
+            english,
+        )
+        self.assertIn(
+            "Do not describe the Release as complete until the remote GitHub Release",
+            english,
+        )
+        self.assertNotIn("The `v0.1.0` Release contains", english)
+        self.assertIn("发布工作流已配置", chinese)
+        self.assertIn("远端 GitHub Release 及下载后的三个制品完成核验前", chinese)
+        self.assertNotIn("`v0.1.0` Release 只包含", chinese)
 
     def test_examples_are_explicitly_fictional_and_public_safe(self) -> None:
         complete = (ROOT / "examples/complete-positioning.md").read_text(

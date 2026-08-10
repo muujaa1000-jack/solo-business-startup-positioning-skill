@@ -72,11 +72,13 @@ python -X utf8 scripts/verify_artifacts.py dist/interview-solo-business-startup-
 
 ### Release 制品
 
-`v0.1.0` Release 只包含以下三个制品：
+发布工作流已配置为在 `v0.1.0` 时发布以下三个制品：
 
 - `interview-solo-business-startup-positioning-0.1.0.zip`
 - `interview-solo-business-startup-positioning-0.1.0.skill`
 - `SHA256SUMS`
+
+在远端 GitHub Release 及下载后的三个制品完成核验前，不得把本次发布写成已完成。
 
 ## 许可证
 

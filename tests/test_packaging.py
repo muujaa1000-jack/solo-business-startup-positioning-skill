@@ -10,6 +10,7 @@ import tempfile
 import unittest
 import zipfile
 from pathlib import Path
+from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -206,6 +207,74 @@ class PackagingTests(unittest.TestCase):
         with temporary:
             self.assertEqual(verify(copied_root, zip_path), [])
             self.assertEqual(verify(copied_root, skill_path), [])
+
+    def test_verifier_rejects_oversized_artifact_before_reading_content(self) -> None:
+        from scripts.verify_artifacts import verify
+
+        temporary, copied_root, zip_path, skill_path, sums_path = (
+            self.build_valid_artifacts()
+        )
+        with temporary:
+            oversized = zip_path.read_bytes() + (b"oversized" * 200_000)
+            zip_path.write_bytes(oversized)
+            skill_path.write_bytes(oversized)
+            digest = hashlib.sha256(oversized).hexdigest()
+            sums_path.write_text(
+                f"{digest}  {zip_path.name}\n{digest}  {skill_path.name}\n",
+                encoding="ascii",
+                newline="\n",
+            )
+            original_open = Path.open
+
+            def reject_untrusted_open(path: Path, *args: object, **kwargs: object):
+                if path in {zip_path, skill_path}:
+                    raise AssertionError("oversized artifact content was opened")
+                return original_open(path, *args, **kwargs)
+
+            try:
+                with mock.patch.object(Path, "open", reject_untrusted_open):
+                    findings = "\n".join(verify(copied_root, zip_path))
+            except AssertionError as error:
+                self.fail(str(error))
+            self.assertIn("canonical size", findings)
+
+    def test_verifier_uses_chunked_reads_for_canonical_compare_and_hashing(self) -> None:
+        from scripts.verify_artifacts import _READ_CHUNK_SIZE, verify
+
+        temporary, copied_root, zip_path, skill_path, _ = self.build_valid_artifacts()
+        with temporary:
+            original_open = Path.open
+            read_sizes: list[int] = []
+
+            class BoundedReader:
+                def __init__(self, stream: object) -> None:
+                    self.stream = stream
+
+                def __enter__(self) -> "BoundedReader":
+                    return self
+
+                def __exit__(self, *args: object) -> object:
+                    return self.stream.__exit__(*args)  # type: ignore[attr-defined]
+
+                def read(self, size: int = -1) -> bytes:
+                    if size < 0 or size > _READ_CHUNK_SIZE:
+                        raise AssertionError(f"unbounded artifact read requested: {size}")
+                    read_sizes.append(size)
+                    return self.stream.read(size)  # type: ignore[attr-defined,no-any-return]
+
+            def bound_artifact_reads(path: Path, *args: object, **kwargs: object):
+                if path in {zip_path, skill_path}:
+                    return BoundedReader(original_open(path, *args, **kwargs))
+                return original_open(path, *args, **kwargs)
+
+            try:
+                with mock.patch.object(Path, "open", bound_artifact_reads):
+                    findings = verify(copied_root, zip_path)
+            except AssertionError as error:
+                self.fail(str(error))
+            self.assertEqual(findings, [])
+            self.assertTrue(read_sizes)
+            self.assertTrue(all(size == _READ_CHUNK_SIZE for size in read_sizes))
 
     def test_verifier_rejects_unsafe_member_paths_without_extracting(self) -> None:
         from scripts.verify_artifacts import _unsafe, verify

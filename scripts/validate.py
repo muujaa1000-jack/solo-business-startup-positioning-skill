@@ -66,7 +66,8 @@ _GITHUB_TOKEN = re.compile(
     r"\b(?:gh[pousr]_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,})\b"
 )
 _SECRET_ASSIGNMENT = re.compile(
-    r"(?im)\b(?:api[_-]?key|secret|token|password|passwd|access[_-]?key)"
+    r"(?im)\b(?:[a-z0-9]+[_-]+)*(?:api[_-]?key|secret[_-]access[_-]key|"
+    r"access[_-]?token|secret|token|password|passwd|access[_-]?key)"
     r"\b\s*[:=]\s*(?P<value>['\"][^'\"\r\n]+['\"]|[^\s#;,]+)"
 )
 _SAFE_SECRET_VALUES = {
@@ -151,7 +152,7 @@ def _text_files(root: Path, excluded: set[str], findings: list[str]) -> list[Pat
         try:
             is_symlink = path.is_symlink()
             resolved = path.resolve()
-        except OSError as error:
+        except (OSError, RuntimeError) as error:
             findings.append(f"{relative_text}: repository path cannot be resolved ({error})")
             continue
         if is_symlink:
@@ -204,7 +205,7 @@ def validate_repository(root: Path) -> list[str]:
         try:
             is_symlink = path.is_symlink()
             resolved = path.resolve()
-        except OSError as error:
+        except (OSError, RuntimeError) as error:
             findings.append(f"{relative}: required path cannot be resolved ({error})")
             unsafe_required.add(relative)
             continue
