@@ -507,10 +507,23 @@ class RepositoryContractTests(unittest.TestCase):
             ".idea/", ".vscode/", "*.swp", "*~",
         }
         self.assertTrue(required_ignores.issubset(ignored), required_ignores - set(ignored))
-        self.assertFalse((ROOT / "SHA256SUMS").exists())
-        self.assertFalse(
-            (ROOT / "dist/interview-solo-business-startup-positioning.zip").exists()
-        )
+        for legacy_path in (
+            "SHA256SUMS",
+            "dist/interview-solo-business-startup-positioning.zip",
+        ):
+            with self.subTest(legacy_path=legacy_path):
+                result = subprocess.run(
+                    ["git", "ls-files", "--error-unmatch", "--", legacy_path],
+                    cwd=ROOT,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+                self.assertNotEqual(
+                    result.returncode,
+                    0,
+                    f"stale artifact remains tracked: {result.stdout}{result.stderr}",
+                )
 
     def test_ci_and_release_workflows_are_pinned_and_complete(self) -> None:
         ci_path = ROOT / ".github/workflows/ci.yml"
@@ -526,6 +539,11 @@ class RepositoryContractTests(unittest.TestCase):
 
         self.assertRegex(ci, r"push:\s*\n\s*branches: \[main\]")
         self.assertRegex(ci, r"(?m)^\s*pull_request:\s*$")
+        ci_permissions = re.search(
+            r"(?ms)^permissions:\n((?:  [^\n]+\n)+)", ci
+        )
+        self.assertIsNotNone(ci_permissions)
+        self.assertEqual("contents: read\n", ci_permissions.group(1).strip() + "\n")
         for version in ("3.10", "3.12", "3.14"):
             self.assertIn(f'"{version}"', ci)
         for command in (
@@ -542,8 +560,21 @@ class RepositoryContractTests(unittest.TestCase):
         self.assertGreaterEqual(ci.count("python scripts/verify_artifacts.py"), 2)
         self.assertIn("SHA256SUMS", ci)
 
-        self.assertRegex(release, r"tags:\s*\n\s*- \"v\*\"")
-        self.assertRegex(release, r"permissions:\s*\n\s*contents: write")
+        release_triggers = re.search(
+            r"(?ms)^on:\n(.*?)(?=^[^ \n]|\Z)", release
+        )
+        self.assertIsNotNone(release_triggers)
+        self.assertEqual(
+            'push:\n    tags:\n      - "v*"',
+            release_triggers.group(1).strip(),
+        )
+        release_permissions = re.search(
+            r"(?ms)^permissions:\n((?:  [^\n]+\n)+)", release
+        )
+        self.assertIsNotNone(release_permissions)
+        self.assertEqual(
+            "contents: write\n", release_permissions.group(1).strip() + "\n"
+        )
         for command in (
             'python -m unittest discover -s tests -p "test_*.py" -v',
             "python scripts/validate.py",
@@ -557,6 +588,39 @@ class RepositoryContractTests(unittest.TestCase):
             "SHA256SUMS",
         ):
             self.assertIn(command, release)
+
+        tag_gate = re.search(
+            r"(?ms)^      - name: Check tag matches VERSION\n(.*?)(?=^      - name:|\Z)",
+            release,
+        )
+        self.assertIsNotNone(tag_gate)
+        self.assertIn('version="$(tr -d \'\\r\\n\' < VERSION)"', tag_gate.group(1))
+        self.assertIn(
+            'if [[ "$GITHUB_REF_NAME" != "v${version}" ]]; then', tag_gate.group(1)
+        )
+        self.assertIn("exit 1", tag_gate.group(1))
+        self.assertLess(
+            release.index("Check tag matches VERSION"),
+            release.index("Create or update GitHub Release"),
+        )
+
+        for asset_definition in (
+            'zip_path="dist/${name}.zip"',
+            'skill_path="dist/${name}.skill"',
+            'sums_path="dist/SHA256SUMS"',
+        ):
+            self.assertIn(asset_definition, release)
+        self.assertEqual(1, release.count("gh release upload"))
+        self.assertEqual(1, release.count("gh release create"))
+        self.assertRegex(
+            release,
+            r'(?m)^            gh release upload "\$GITHUB_REF_NAME" "\$zip_path" "\$skill_path" "\$sums_path" --clobber --repo "\$GITHUB_REPOSITORY"$',
+        )
+        self.assertRegex(
+            release,
+            r'(?m)^            gh release create "\$GITHUB_REF_NAME" "\$zip_path" "\$skill_path" "\$sums_path" \\$',
+        )
+        self.assertNotIn("dist/*", release)
 
         for name, workflow in workflows.items():
             with self.subTest(workflow=name):
