@@ -238,6 +238,55 @@ class PackagingTests(unittest.TestCase):
                 self.fail(str(error))
             self.assertIn("canonical size", findings)
 
+    def test_verifier_rejects_oversized_skill_before_open_or_hash(self) -> None:
+        from scripts.verify_artifacts import verify
+
+        temporary, copied_root, zip_path, skill_path, _ = self.build_valid_artifacts()
+        with temporary:
+            skill_path.write_bytes(
+                skill_path.read_bytes() + (b"oversized-skill" * 200_000)
+            )
+            original_open = Path.open
+
+            def reject_oversized_skill_open(
+                path: Path, *args: object, **kwargs: object
+            ):
+                if path == skill_path:
+                    raise AssertionError("oversized .skill was opened or hashed")
+                return original_open(path, *args, **kwargs)
+
+            try:
+                with mock.patch.object(Path, "open", reject_oversized_skill_open):
+                    findings = "\n".join(verify(copied_root, zip_path))
+            except AssertionError as error:
+                self.fail(str(error))
+            self.assertIn(skill_path.name, findings)
+            self.assertIn("canonical size", findings)
+
+    def test_verifier_rejects_oversized_checksum_manifest_before_open(self) -> None:
+        from scripts.verify_artifacts import verify
+
+        temporary, copied_root, zip_path, _, sums_path = self.build_valid_artifacts()
+        with temporary:
+            sums_path.write_bytes(
+                sums_path.read_bytes() + (b"oversized-manifest" * 200_000)
+            )
+            original_open = Path.open
+
+            def reject_oversized_manifest_open(
+                path: Path, *args: object, **kwargs: object
+            ):
+                if path == sums_path:
+                    raise AssertionError("oversized SHA256SUMS was opened")
+                return original_open(path, *args, **kwargs)
+
+            try:
+                with mock.patch.object(Path, "open", reject_oversized_manifest_open):
+                    findings = "\n".join(verify(copied_root, zip_path))
+            except AssertionError as error:
+                self.fail(str(error))
+            self.assertIn("SHA256SUMS: canonical size", findings)
+
     def test_verifier_uses_chunked_reads_for_canonical_compare_and_hashing(self) -> None:
         from scripts.verify_artifacts import _READ_CHUNK_SIZE, verify
 
@@ -269,6 +318,44 @@ class PackagingTests(unittest.TestCase):
 
             try:
                 with mock.patch.object(Path, "open", bound_artifact_reads):
+                    findings = verify(copied_root, zip_path)
+            except AssertionError as error:
+                self.fail(str(error))
+            self.assertEqual(findings, [])
+            self.assertTrue(read_sizes)
+            self.assertTrue(all(size == _READ_CHUNK_SIZE for size in read_sizes))
+
+    def test_verifier_compares_exact_size_checksum_manifest_in_chunks(self) -> None:
+        from scripts.verify_artifacts import _READ_CHUNK_SIZE, verify
+
+        temporary, copied_root, zip_path, _, sums_path = self.build_valid_artifacts()
+        with temporary:
+            original_open = Path.open
+            read_sizes: list[int] = []
+
+            class BoundedReader:
+                def __init__(self, stream: object) -> None:
+                    self.stream = stream
+
+                def __enter__(self) -> "BoundedReader":
+                    return self
+
+                def __exit__(self, *args: object) -> object:
+                    return self.stream.__exit__(*args)  # type: ignore[attr-defined]
+
+                def read(self, size: int = -1) -> bytes:
+                    if size < 0 or size > _READ_CHUNK_SIZE:
+                        raise AssertionError(f"unbounded manifest read requested: {size}")
+                    read_sizes.append(size)
+                    return self.stream.read(size)  # type: ignore[attr-defined,no-any-return]
+
+            def bound_manifest_reads(path: Path, *args: object, **kwargs: object):
+                if path == sums_path:
+                    return BoundedReader(original_open(path, *args, **kwargs))
+                return original_open(path, *args, **kwargs)
+
+            try:
+                with mock.patch.object(Path, "open", bound_manifest_reads):
                     findings = verify(copied_root, zip_path)
             except AssertionError as error:
                 self.fail(str(error))

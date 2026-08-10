@@ -240,16 +240,19 @@ class RepositoryContractTests(unittest.TestCase):
             "https://docs.anthropic.com/en/docs/claude-code",
             "https://agentskills.io/specification",
         ]
-        for link in links:
-            with self.subTest(link=link):
-                temporary, copied_root = self.copied_repository()
-                with temporary:
-                    readme = copied_root / "README.md"
-                    readme.write_text(
-                        readme.read_text(encoding="utf-8").replace(link, ""),
-                        encoding="utf-8",
-                    )
-                    self.assert_validator_rejects(copied_root, "official compatibility")
+        for readme_name in ("README.md", "README.zh-CN.md"):
+            for link in links:
+                with self.subTest(readme=readme_name, link=link):
+                    temporary, copied_root = self.copied_repository()
+                    with temporary:
+                        readme = copied_root / readme_name
+                        readme.write_text(
+                            readme.read_text(encoding="utf-8").replace(link, ""),
+                            encoding="utf-8",
+                        )
+                        self.assert_validator_rejects(
+                            copied_root, "official compatibility"
+                        )
 
     def test_validator_detects_windows_slash_paths_and_documentation(self) -> None:
         cases = [

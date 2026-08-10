@@ -299,14 +299,17 @@ def validate_repository(root: Path) -> list[str]:
                 if len(ids) != len(set(ids)):
                     findings.append("evals/cases.json: case ids must be unique")
 
-    readme = decoded.get("README.md", "")
-    for url in (
-        "https://developers.openai.com/codex/skills/",
-        "https://docs.anthropic.com/en/docs/claude-code",
-        "https://agentskills.io/specification",
-    ):
-        if url not in readme:
-            findings.append(f"README.md: missing official compatibility link {url}")
+    for readme_name in ("README.md", "README.zh-CN.md"):
+        readme = decoded.get(readme_name, "")
+        for url in (
+            "https://developers.openai.com/codex/skills/",
+            "https://docs.anthropic.com/en/docs/claude-code",
+            "https://agentskills.io/specification",
+        ):
+            if url not in readme:
+                findings.append(
+                    f"{readme_name}: missing official compatibility link {url}"
+                )
     return findings
 
 
