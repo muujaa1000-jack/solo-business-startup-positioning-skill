@@ -106,6 +106,45 @@ class PackagingTests(unittest.TestCase):
             newline="\n",
         )
 
+    def rewrite_with_metadata(
+        self,
+        source_root: Path,
+        zip_path: Path,
+        skill_path: Path,
+        sums_path: Path,
+        *,
+        archive_comment: bytes = b"",
+        member_comment: bytes = b"",
+        member_extra: bytes = b"",
+    ) -> None:
+        from scripts.package import FIXED_ZIP_TIMESTAMP
+        from scripts.verify_artifacts import expected_members
+        from scripts.validate import normalized_runtime_bytes
+
+        rewritten = zip_path.with_suffix(".rewritten")
+        with zipfile.ZipFile(
+            rewritten, "w", zipfile.ZIP_DEFLATED, compresslevel=9
+        ) as archive:
+            archive.comment = archive_comment
+            for index, member in enumerate(expected_members()):
+                relative = member.split("/", 1)[1]
+                info = zipfile.ZipInfo(member, FIXED_ZIP_TIMESTAMP)
+                info.compress_type = zipfile.ZIP_DEFLATED
+                info.create_system = 3
+                info.external_attr = 0o100644 << 16
+                if index == 0:
+                    info.comment = member_comment
+                    info.extra = member_extra
+                archive.writestr(info, normalized_runtime_bytes(source_root, relative))
+        rewritten.replace(zip_path)
+        shutil.copyfile(zip_path, skill_path)
+        digest = hashlib.sha256(zip_path.read_bytes()).hexdigest()
+        sums_path.write_text(
+            f"{digest}  {zip_path.name}\n{digest}  {skill_path.name}\n",
+            encoding="ascii",
+            newline="\n",
+        )
+
     def test_builds_are_byte_identical_and_whitelisted(self) -> None:
         from scripts.package import FIXED_ZIP_TIMESTAMP, build
         from scripts.verify_artifacts import expected_members
@@ -169,17 +208,22 @@ class PackagingTests(unittest.TestCase):
             self.assertEqual(verify(copied_root, skill_path), [])
 
     def test_verifier_rejects_unsafe_member_paths_without_extracting(self) -> None:
-        from scripts.verify_artifacts import verify
+        from scripts.verify_artifacts import _unsafe, verify
 
         unsafe_names = (
             "",
             "../outside.txt",
             "/absolute.txt",
+            "C:/absolute.txt",
             "interview-solo-business-startup-positioning\\backslash.txt",
             "interview-solo-business-startup-positioning/./dot.txt",
             "interview-solo-business-startup-positioning/../parent.txt",
             "interview-solo-business-startup-positioning//empty.txt",
         )
+        for unsafe_name in unsafe_names:
+            with self.subTest(predicate=unsafe_name):
+                self.assertTrue(_unsafe(unsafe_name))
+
         temporary, copied_root, zip_path, _, _ = self.build_valid_artifacts()
         with temporary:
             for index, unsafe_name in enumerate(unsafe_names):
@@ -212,6 +256,36 @@ class PackagingTests(unittest.TestCase):
             self.write_archive(mismatch, copied_root, {"LICENSE": b"changed\n"})
             self.assertIn("does not match source", "\n".join(verify(copied_root, mismatch)))
             self.assertEqual(expected_members(), sorted(expected_members()))
+
+    def test_verifier_rejects_noncanonical_zip_metadata_after_rechecksumming(self) -> None:
+        from scripts.package import build
+        from scripts.verify_artifacts import verify
+
+        temporary, copied_root, zip_path, skill_path, sums_path = (
+            self.build_valid_artifacts()
+        )
+        with temporary:
+            cases = (
+                ("archive comment", {"archive_comment": b"hostile archive comment"}),
+                ("member comment", {"member_comment": b"hostile member comment"}),
+                (
+                    "member extra field",
+                    {"member_extra": b"\xfe\xca\x04\x00evil"},
+                ),
+            )
+            for expected, metadata in cases:
+                with self.subTest(metadata=expected):
+                    build(copied_root, zip_path.parent)
+                    self.rewrite_with_metadata(
+                        copied_root,
+                        zip_path,
+                        skill_path,
+                        sums_path,
+                        **metadata,
+                    )
+                    findings = "\n".join(verify(copied_root, zip_path))
+                    self.assertIn(expected, findings)
+                    self.assertIn("canonical bytes", findings)
 
     def test_verifier_rejects_checksum_and_peer_identity_mismatches(self) -> None:
         from scripts.verify_artifacts import verify

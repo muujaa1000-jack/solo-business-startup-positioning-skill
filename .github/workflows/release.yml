@@ -47,16 +47,36 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          set -euo pipefail
           version="$(tr -d '\r\n' < VERSION)"
           name="interview-solo-business-startup-positioning-${version}"
           zip_path="dist/${name}.zip"
           skill_path="dist/${name}.skill"
           sums_path="dist/SHA256SUMS"
+          expected_asset_names=(
+            "${name}.zip"
+            "${name}.skill"
+            "SHA256SUMS"
+          )
+          expected_assets="$(printf '%s\n' "${expected_asset_names[@]}" | LC_ALL=C sort)"
           if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            existing_assets="$(gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' | LC_ALL=C sort)"
+            unexpected_assets="$(comm -13 <(printf '%s\n' "$expected_assets") <(printf '%s\n' "$existing_assets"))"
+            if [[ -n "$unexpected_assets" ]]; then
+              echo "Existing release has unexpected assets:" >&2
+              printf '%s\n' "$unexpected_assets" >&2
+              exit 1
+            fi
             gh release upload "$GITHUB_REF_NAME" "$zip_path" "$skill_path" "$sums_path" --clobber --repo "$GITHUB_REPOSITORY"
           else
             gh release create "$GITHUB_REF_NAME" "$zip_path" "$skill_path" "$sums_path" \
               --repo "$GITHUB_REPOSITORY" \
               --title "$GITHUB_REF_NAME" \
               --generate-notes
+          fi
+          published_assets="$(gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' | LC_ALL=C sort)"
+          if [[ "$published_assets" != "$expected_assets" ]]; then
+            echo "Published release asset set does not exactly match the expected three names." >&2
+            printf 'Expected:\n%s\nPublished:\n%s\n' "$expected_assets" "$published_assets" >&2
+            exit 1
           fi

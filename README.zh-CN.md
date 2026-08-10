@@ -35,6 +35,8 @@ $interview-solo-business-startup-positioning
 - 由使用者明确选择、组合或保留候选；
 - 七个同级部分的最终交接内容，以及下一阶段使用的交接卡。
 
+可查看[完整虚构定位示例](examples/complete-positioning.md)和[证据不足示例](examples/insufficient-evidence.zh-CN.md)。公开的全新上下文提示与复核方法见[行为评测](evals/README.md)。它们是书面示例和静态评测规范，不是模型行为已经通过验证的证明。
+
 ## 商业化验证器
 
 交接卡是`待验证假设`，不等于市场已经证明。请把它交给[solo-business-validation-skill](https://github.com/muujaa1000-jack/solo-business-validation-skill)，验证需求、付款、获客和交付经济性。本 Skill 不批准直接完整开发，也不执行联系、发布、收费或花钱。
@@ -60,6 +62,21 @@ python -X utf8 -m unittest discover -s tests -p "test_*.py" -v
 ## 开发与发布
 
 贡献应保持首轮只问一个问题、五种信息状态、候选决策路径和七部分最终交接不变。改变行为前先新增或更新契约测试或评测。详见[CONTRIBUTING.md](CONTRIBUTING.md)、[SECURITY.md](SECURITY.md) 和 [CHANGELOG.md](CHANGELOG.md)；当前源码版本见[VERSION](VERSION)。
+
+使用以下命令生成确定性发布制品，并对照源码重新生成的规范制品进行复验：
+
+```text
+python -X utf8 scripts/package.py --output-dir dist
+python -X utf8 scripts/verify_artifacts.py dist/interview-solo-business-startup-positioning-0.1.0.zip dist/interview-solo-business-startup-positioning-0.1.0.skill
+```
+
+### Release 制品
+
+`v0.1.0` Release 只包含以下三个制品：
+
+- `interview-solo-business-startup-positioning-0.1.0.zip`
+- `interview-solo-business-startup-positioning-0.1.0.skill`
+- `SHA256SUMS`
 
 ## 许可证
 

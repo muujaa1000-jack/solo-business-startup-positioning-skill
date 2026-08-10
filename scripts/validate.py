@@ -55,16 +55,27 @@ _IGNORED_DIRECTORIES = {
 }
 _SEMVER = re.compile(r"^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)$")
 _WINDOWS_HOME = re.compile(r"(?i)\b[a-z]:[\\/]+users[\\/]+[^\\/\s]+")
-_UNIX_HOME = re.compile(r"(?<![:\w/])/(?:home|users)/[^/\s]+", re.IGNORECASE)
+_UNIX_HOME = re.compile(
+    r"(?<![:\w/])/(?:root(?:/[^/\s]+)?|(?:home|users)/[^/\s]+)",
+    re.IGNORECASE,
+)
+_TILDE_HOME = re.compile(r"(?<!\w)~[\\/][^\s]+")
 _LOCAL_PROJECT = re.compile(r"(?i)\b[a-z]:[\\/]+codex[\\/]+")
 _PRIVATE_KEY = re.compile(r"-----BEGIN (?:[A-Z0-9 ]+ )?PRIVATE KEY-----")
 _GITHUB_TOKEN = re.compile(
     r"\b(?:gh[pousr]_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,})\b"
 )
-_EMBEDDED_SECRET = re.compile(
+_SECRET_ASSIGNMENT = re.compile(
     r"(?im)\b(?:api[_-]?key|secret|token|password|passwd|access[_-]?key)"
-    r"\b\s*[:=]\s*['\"][^'\"\r\n]{8,}['\"]"
+    r"\b\s*[:=]\s*(?P<value>['\"][^'\"\r\n]+['\"]|[^\s#;,]+)"
 )
+_SAFE_SECRET_VALUES = {
+    "changeme",
+    "example",
+    "fixture",
+    "placeholder",
+    "redacted",
+}
 
 
 def normalized_runtime_bytes(root: Path, relative: str) -> bytes:
@@ -90,21 +101,66 @@ def scan_text(relative: str, text: str) -> list[str]:
     checks = (
         (_WINDOWS_HOME, "Windows home path"),
         (_UNIX_HOME, "Unix home path"),
+        (_TILDE_HOME, "tilde home path"),
         (_LOCAL_PROJECT, "local project path"),
         (_PRIVATE_KEY, "private-key header"),
         (_GITHUB_TOKEN, "GitHub token"),
-        (_EMBEDDED_SECRET, "embedded secret"),
     )
-    return [f"{relative}: {label}" for pattern, label in checks if pattern.search(text)]
+    findings: list[str] = []
+    for pattern, label in checks:
+        matches = list(pattern.finditer(text))
+        if label in {"Unix home path", "tilde home path"}:
+            matches = [
+                match
+                for match in matches
+                if not match.group(0).rstrip("`,;:)").endswith("/...")
+            ]
+        if matches:
+            findings.append(f"{relative}: {label}")
+    for match in _SECRET_ASSIGNMENT.finditer(text):
+        value = match.group("value").strip("'\"")
+        lowered = value.lower()
+        if len(value) < 8:
+            continue
+        if (
+            value.startswith(("$", "<"))
+            or lowered in _SAFE_SECRET_VALUES
+            or re.fullmatch(r"(?:x+|\*+|0+)", lowered)
+            or (
+                relative.startswith("tests/")
+                and value.startswith("\\\"")
+                and "not-a-real-secret" in lowered
+            )
+        ):
+            continue
+        findings.append(f"{relative}: embedded secret")
+        break
+    return findings
 
 
-def _text_files(root: Path) -> list[Path]:
+def _text_files(root: Path, excluded: set[str], findings: list[str]) -> list[Path]:
     files: list[Path] = []
     for path in root.rglob("*"):
-        if not path.is_file():
+        relative = path.relative_to(root)
+        relative_text = relative.as_posix()
+        if relative_text in excluded:
             continue
-        relative_parts = path.relative_to(root).parts
+        relative_parts = relative.parts
         if any(part in _IGNORED_DIRECTORIES for part in relative_parts):
+            continue
+        try:
+            is_symlink = path.is_symlink()
+            resolved = path.resolve()
+        except OSError as error:
+            findings.append(f"{relative_text}: repository path cannot be resolved ({error})")
+            continue
+        if is_symlink:
+            findings.append(f"{relative_text}: repository path must not be a symbolic link")
+        if not resolved.is_relative_to(root):
+            findings.append(f"{relative_text}: repository path resolves outside repository root")
+        if is_symlink or not resolved.is_relative_to(root):
+            continue
+        if not path.is_file():
             continue
         files.append(path)
     return files
@@ -142,12 +198,28 @@ def validate_repository(root: Path) -> list[str]:
     """Return every repository contract or public-safety failure at *root*."""
     root = root.resolve()
     findings: list[str] = []
+    unsafe_required: set[str] = set()
     for relative in REQUIRED_FILES:
-        if not (root / relative).is_file():
+        path = root / relative
+        try:
+            is_symlink = path.is_symlink()
+            resolved = path.resolve()
+        except OSError as error:
+            findings.append(f"{relative}: required path cannot be resolved ({error})")
+            unsafe_required.add(relative)
+            continue
+        if is_symlink:
+            findings.append(f"{relative}: required file must not be a symbolic link")
+            unsafe_required.add(relative)
+        if not resolved.is_relative_to(root):
+            findings.append(f"{relative}: required file resolves outside repository root")
+            unsafe_required.add(relative)
+        if relative not in unsafe_required and not path.is_file():
             findings.append(f"{relative}: required file is missing")
+            unsafe_required.add(relative)
 
     decoded: dict[str, str] = {}
-    for path in _text_files(root):
+    for path in _text_files(root, unsafe_required, findings):
         relative = path.relative_to(root).as_posix()
         try:
             text = path.read_text(encoding="utf-8")

@@ -56,6 +56,12 @@ $interview-solo-business-startup-positioning
 - A seven-section final handoff, including a card for the next validation
   stage.
 
+See the [complete fictional positioning example](examples/complete-positioning.md)
+and the [insufficient-evidence example](examples/insufficient-evidence.zh-CN.md).
+Public fresh-context prompts and their review method are in the
+[evaluation cases](evals/README.md). These are written examples and static
+evaluation specifications, not proof of model behavior.
+
 ## Commercialization validator
 
 The handoff card is a `待验证假设` (hypothesis to validate), not proof of a
@@ -99,6 +105,22 @@ information states, the candidate-decision paths, and the seven-section final
 handoff. Add or update a contract or evaluation before changing behavior. See
 [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md), and
 [CHANGELOG.md](CHANGELOG.md). The current source version is in [VERSION](VERSION).
+
+Build the deterministic release artifacts and verify them against a fresh
+canonical build from the source files:
+
+```text
+python -X utf8 scripts/package.py --output-dir dist
+python -X utf8 scripts/verify_artifacts.py dist/interview-solo-business-startup-positioning-0.1.0.zip dist/interview-solo-business-startup-positioning-0.1.0.skill
+```
+
+### Release artifacts
+
+The `v0.1.0` Release contains exactly these three assets:
+
+- `interview-solo-business-startup-positioning-0.1.0.zip`
+- `interview-solo-business-startup-positioning-0.1.0.skill`
+- `SHA256SUMS`
 
 ## License
 

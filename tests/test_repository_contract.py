@@ -6,6 +6,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -295,6 +296,132 @@ class RepositoryContractTests(unittest.TestCase):
             readme.mkdir()
             self.assert_validator_rejects(copied_root, "required file is missing")
 
+    def test_validator_rejects_symlinked_required_files_before_reading(self) -> None:
+        from scripts.validate import validate_repository
+
+        temporary, copied_root = self.copied_repository()
+        with temporary:
+            runtime = copied_root / "SKILL.md"
+            runtime_copy = copied_root / "SKILL.real.md"
+            runtime.rename(runtime_copy)
+            try:
+                runtime.symlink_to(runtime_copy.name)
+            except OSError:
+                runtime_copy.rename(runtime)
+                original_is_symlink = Path.is_symlink
+                with mock.patch.object(
+                    Path,
+                    "is_symlink",
+                    autospec=True,
+                    side_effect=lambda path: (
+                        True if path == runtime else original_is_symlink(path)
+                    ),
+                ):
+                    self.assertIn(
+                        "symbolic link", "\n".join(validate_repository(copied_root))
+                    )
+            else:
+                self.assert_validator_rejects(copied_root, "symbolic link")
+                runtime.unlink()
+                runtime_copy.rename(runtime)
+
+            if runtime_copy.exists():
+                runtime_copy.rename(runtime)
+            outside = Path(temporary.name) / "outside-readme.md"
+            outside.write_bytes(b"\xff")
+            required = copied_root / "README.md"
+            required.unlink()
+            try:
+                required.symlink_to(outside)
+            except OSError:
+                source = ROOT / "README.md"
+                shutil.copyfile(source, required)
+                original_resolve = Path.resolve
+                with mock.patch.object(
+                    Path,
+                    "resolve",
+                    autospec=True,
+                    side_effect=lambda path, *args, **kwargs: (
+                        outside
+                        if path == required
+                        else original_resolve(path, *args, **kwargs)
+                    ),
+                ):
+                    findings = "\n".join(validate_repository(copied_root))
+                    self.assertIn("outside repository root", findings)
+                    self.assertNotIn("UTF-8", findings)
+            else:
+                result = self.run_validator(copied_root)
+                self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertIn("outside repository root", result.stdout + result.stderr)
+                self.assertNotIn("UTF-8", result.stdout + result.stderr)
+
+    def test_validator_rejects_nonrequired_paths_resolving_outside_root(self) -> None:
+        from scripts.validate import validate_repository
+
+        temporary, copied_root = self.copied_repository()
+        with temporary:
+            outside = Path(temporary.name) / "outside-public.md"
+            outside.write_bytes(b"\xff")
+            public_path = copied_root / "docs/extra-public.md"
+            try:
+                public_path.symlink_to(outside)
+            except OSError:
+                public_path.write_text("safe local stand-in\n", encoding="utf-8")
+                original_resolve = Path.resolve
+                with mock.patch.object(
+                    Path,
+                    "resolve",
+                    autospec=True,
+                    side_effect=lambda path, *args, **kwargs: (
+                        outside
+                        if path == public_path
+                        else original_resolve(path, *args, **kwargs)
+                    ),
+                ):
+                    findings = "\n".join(validate_repository(copied_root))
+            else:
+                findings = "\n".join(validate_repository(copied_root))
+            self.assertIn("docs/extra-public.md", findings)
+            self.assertIn("outside repository root", findings)
+            self.assertNotIn("UTF-8", findings)
+
+    def test_validator_detects_root_tilde_and_unquoted_secrets(self) -> None:
+        cases = [
+            ("root home", "/" + "root/private.txt", "Unix home path"),
+            ("tilde home", "~" + "/private.txt", "tilde home path"),
+            (
+                "unquoted secret",
+                "api_" + "key=live-secret-value-12345",
+                "embedded secret",
+            ),
+        ]
+        for name, unsafe_text, expected in cases:
+            with self.subTest(name=name):
+                temporary, copied_root = self.copied_repository()
+                with temporary:
+                    readme = copied_root / "README.md"
+                    readme.write_text(
+                        readme.read_text(encoding="utf-8") + "\n" + unsafe_text,
+                        encoding="utf-8",
+                    )
+                    self.assert_validator_rejects(copied_root, expected)
+
+    def test_validator_allows_documented_secret_placeholders(self) -> None:
+        from scripts.validate import scan_text
+
+        safe_examples = "\n".join(
+            (
+                "api_" + "key=${API_KEY}",
+                "api_" + "key=<YOUR_API_KEY>",
+                "api_" + "key=placeholder",
+                "token=$" + "{{ github.token }}",
+            )
+        )
+        self.assertEqual([], scan_text("docs/example.md", safe_examples))
+        result = self.run_validator(ROOT)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
     def test_validator_detects_private_paths_and_tokens(self) -> None:
         cases = [
             ("windows home", "C:" + r"\Users\Ada\secret.txt", "Windows home path"),
@@ -382,6 +509,47 @@ class RepositoryContractTests(unittest.TestCase):
         self.assertIn("solo-business-validation-skill", english)
         self.assertIn("solo-business-validation-skill", chinese)
 
+    def test_readmes_link_public_evidence_and_exact_release_artifacts(self) -> None:
+        english = (ROOT / "README.md").read_text(encoding="utf-8")
+        chinese = (ROOT / "README.zh-CN.md").read_text(encoding="utf-8")
+        for text in (english, chinese):
+            for target in (
+                "examples/complete-positioning.md",
+                "examples/insufficient-evidence.zh-CN.md",
+                "evals/README.md",
+            ):
+                self.assertRegex(text, rf"\[[^\]]+\]\({re.escape(target)}\)")
+            self.assertIn(
+                "python -X utf8 scripts/package.py --output-dir dist", text
+            )
+            self.assertIn(
+                "python -X utf8 scripts/verify_artifacts.py "
+                "dist/interview-solo-business-startup-positioning-0.1.0.zip "
+                "dist/interview-solo-business-startup-positioning-0.1.0.skill",
+                text,
+            )
+
+        expected_assets = [
+            "interview-solo-business-startup-positioning-0.1.0.zip",
+            "interview-solo-business-startup-positioning-0.1.0.skill",
+            "SHA256SUMS",
+        ]
+        for text, heading in (
+            (english, "### Release artifacts"),
+            (chinese, "### Release 制品"),
+        ):
+            section = re.search(
+                rf"(?ms)^{re.escape(heading)}\n(.*?)(?=^### |^## |\Z)", text
+            )
+            self.assertIsNotNone(section)
+            self.assertEqual(
+                expected_assets,
+                re.findall(r"(?m)^- `([^`]+)`$", section.group(1)),
+            )
+
+        self.assertIn("not a claim of live installation", english)
+        self.assertIn("不等于已声明某个宿主或版本安装成功", chinese)
+
     def test_examples_are_explicitly_fictional_and_public_safe(self) -> None:
         complete = (ROOT / "examples/complete-positioning.md").read_text(
             encoding="utf-8"
@@ -464,6 +632,60 @@ class RepositoryContractTests(unittest.TestCase):
                 {"id", "prompt", "stage", "expected_behaviors"}, set(case)
             )
             self.assertGreaterEqual(len(case["expected_behaviors"]), 3)
+
+    def test_candidate_decision_evals_are_self_contained_fictional_states(self) -> None:
+        cases = {
+            case["id"]: case
+            for case in json.loads(
+                (ROOT / "evals/cases.json").read_text(encoding="utf-8")
+            )
+        }
+        required_prior_state = (
+            "Fresh-context fictional scenario",
+            "Current state:",
+            "Interview goal:",
+            "Experience:",
+            "Capabilities:",
+            "Resources:",
+            "Interests:",
+            "Reachable people:",
+            "Constraints:",
+            "Fictional candidates:",
+            "Candidate A:",
+            "Candidate B:",
+            "User decision:",
+        )
+        for identifier in ("reject-all", "retain-multiple"):
+            with self.subTest(case=identifier):
+                prompt = cases[identifier]["prompt"]
+                for phrase in required_prior_state:
+                    self.assertIn(phrase, prompt)
+                self.assertNotIn("After reviewing the candidates", prompt)
+                candidate_a = prompt.split("Candidate A:", 1)[1].split(
+                    "Candidate B:", 1
+                )[0]
+                candidate_b = prompt.split("Candidate B:", 1)[1].split(
+                    "User decision:", 1
+                )[0]
+                for candidate in (candidate_a, candidate_b):
+                    for field in (
+                        "Identity:",
+                        "Customer:",
+                        "Problem:",
+                        "Value:",
+                        "Minimum product or service:",
+                        "Pricing hypothesis:",
+                        "Acquisition hypothesis:",
+                        "Delivery:",
+                        "Content or brand role:",
+                        "Existing evidence:",
+                        "Biggest unknown:",
+                    ):
+                        self.assertIn(field, candidate)
+
+        evaluation = (ROOT / "evals/README.md").read_text(encoding="utf-8")
+        self.assertIn("self-contained fictional prior state", evaluation)
+        self.assertIn("does not prove that a multi-turn interview occurred", evaluation)
 
     def test_eval_method_requires_fresh_manual_dated_review(self) -> None:
         evaluation = (ROOT / "evals/README.md").read_text(encoding="utf-8")
@@ -631,3 +853,27 @@ class RepositoryContractTests(unittest.TestCase):
                         uses,
                         r"^[^\s@]+@[0-9a-f]{40}(?:\s+#.*)?$",
                     )
+
+    def test_existing_release_assets_are_fail_closed_before_and_after_upload(self) -> None:
+        release = (ROOT / ".github/workflows/release.yml").read_text(
+            encoding="utf-8"
+        )
+        for expected_name in (
+            '"${name}.zip"',
+            '"${name}.skill"',
+            '"SHA256SUMS"',
+        ):
+            self.assertIn(expected_name, release)
+        self.assertIn("expected_asset_names", release)
+        self.assertIn("existing_assets", release)
+        self.assertIn("unexpected_assets", release)
+        self.assertIn("comm -13", release)
+        self.assertIn("published_assets", release)
+        self.assertIn('if [[ "$published_assets" != "$expected_assets" ]]; then', release)
+        upload = release.index("gh release upload")
+        self.assertLess(release.index("existing_assets"), upload)
+        self.assertGreater(release.index("published_assets"), upload)
+        self.assertGreaterEqual(
+            release.count("--json assets --jq '.assets[].name'"), 2
+        )
+        self.assertNotIn("dist/*", release)

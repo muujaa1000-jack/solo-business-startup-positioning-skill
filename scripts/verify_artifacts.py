@@ -4,14 +4,15 @@ from __future__ import annotations
 
 import hashlib
 import sys
+import tempfile
 import zipfile
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 
 try:
-    from scripts.package import FIXED_ZIP_TIMESTAMP
+    from scripts.package import FIXED_ZIP_TIMESTAMP, build
     from scripts.validate import RUNTIME_FILES, SKILL_NAME, normalized_runtime_bytes, scan_text
 except ModuleNotFoundError:
-    from package import FIXED_ZIP_TIMESTAMP  # type: ignore[no-redef]
+    from package import FIXED_ZIP_TIMESTAMP, build  # type: ignore[no-redef]
     from validate import (  # type: ignore[no-redef]
         RUNTIME_FILES,
         SKILL_NAME,
@@ -27,12 +28,13 @@ def expected_members() -> list[str]:
 
 
 def _unsafe(name: str) -> bool:
-    path = PurePosixPath(name)
+    parts = name.split("/")
     return (
         not name
         or name.startswith(("/", "\\"))
         or "\\" in name
-        or any(part in {"", ".", ".."} for part in path.parts)
+        or (len(name) >= 2 and name[0].isalpha() and name[1] == ":")
+        or any(part in {"", ".", ".."} for part in parts)
     )
 
 
@@ -67,6 +69,12 @@ def _verify_checksums(zip_path: Path, skill_path: Path) -> list[str]:
     return []
 
 
+def _canonical_archive_bytes(root: Path) -> bytes:
+    with tempfile.TemporaryDirectory() as directory:
+        zip_path, _, _ = build(root, Path(directory))
+        return zip_path.read_bytes()
+
+
 def verify(root: Path, artifact: Path) -> list[str]:
     """Return all validation findings without extracting an untrusted archive."""
     root = root.resolve()
@@ -80,6 +88,14 @@ def verify(root: Path, artifact: Path) -> list[str]:
 
     if not artifact.is_file():
         return [*findings, f"{artifact}: artifact is missing"]
+    try:
+        canonical = _canonical_archive_bytes(root)
+        if artifact.read_bytes() != canonical:
+            findings.append(
+                "artifact canonical bytes: must exactly match a fresh source build"
+            )
+    except (OSError, ValueError) as error:
+        findings.append(f"artifact canonical bytes: cannot regenerate ({error})")
     if not zip_path.is_file() or not skill_path.is_file():
         findings.append("release pair: both versioned ZIP and .skill files are required")
     else:
@@ -93,6 +109,8 @@ def verify(root: Path, artifact: Path) -> list[str]:
     try:
         with zipfile.ZipFile(artifact) as archive:
             infos = archive.infolist()
+            if archive.comment:
+                findings.append("archive comment: must be empty")
             names = [info.filename for info in infos]
             for name in names:
                 if _unsafe(name):
@@ -104,6 +122,10 @@ def verify(root: Path, artifact: Path) -> list[str]:
 
             for info in infos:
                 relative = info.filename.split("/", 1)[1]
+                if info.comment:
+                    findings.append(f"{info.filename}: member comment must be empty")
+                if info.extra:
+                    findings.append(f"{info.filename}: member extra field must be empty")
                 if info.date_time != FIXED_ZIP_TIMESTAMP:
                     findings.append(f"{info.filename}: timestamp is not deterministic")
                 if info.create_system != 3 or (info.external_attr >> 16) != 0o100644:
