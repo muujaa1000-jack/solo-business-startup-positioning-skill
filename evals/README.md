@@ -6,10 +6,10 @@ implements the behavior.
 
 ## Method
 
-For each case, run two fresh contexts: one without the Skill and one with the
-Skill available. Repeat each condition five times for every case. Manually
-review every response against `expected_behaviors`, including reply shape,
-evidence labels, decision path, and whether a final handoff was allowed.
+For each case, run two fresh contexts: one without the Skill and one with the Skill available.
+Complete five repetitions per case for each condition. Use manual review for
+every response against `expected_behaviors`, including reply shape, evidence
+labels, decision path, and whether a final handoff was allowed.
 
 Record the date, model, host, model or host version if available, invocation
 method, prompt, raw response, reviewer, and result. A dated record is evidence

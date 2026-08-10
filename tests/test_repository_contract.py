@@ -145,6 +145,20 @@ class RepositoryContractTests(unittest.TestCase):
             )
             self.assertGreaterEqual(len(case["expected_behaviors"]), 3)
 
+    def test_eval_method_requires_fresh_manual_dated_review(self) -> None:
+        evaluation = (ROOT / "evals/README.md").read_text(encoding="utf-8")
+        for phrase in (
+            "fresh contexts",
+            "without the Skill",
+            "with the Skill",
+            "five repetitions per case",
+            "manual review",
+            "date, model, host",
+            "model-host combination",
+            "do not generalize",
+        ):
+            self.assertIn(phrase, evaluation)
+
     def test_maintenance_docs_are_project_specific(self) -> None:
         contributing = (ROOT / "CONTRIBUTING.md").read_text(encoding="utf-8")
         security = (ROOT / "SECURITY.md").read_text(encoding="utf-8")
