@@ -470,6 +470,21 @@ If review reports no Critical or Important finding, proceed without another comm
 
 ---
 
+### Task 5C: Close final artifact and mirror gates
+
+**Files:**
+- Modify: `scripts/validate.py`, `scripts/verify_artifacts.py`
+- Modify: `tests/test_repository_contract.py`, `tests/test_packaging.py`
+
+**Required RED-GREEN slices:**
+
+1. Add temporary-copy regressions that remove each required official compatibility link from `README.zh-CN.md`; require all three links independently in both README mirrors.
+2. Add hostile-pair regressions for a canonical ZIP with an oversized `.skill`, and for an oversized `SHA256SUMS`; reject each file by canonical expected size before content reads or hashing.
+3. Compare the checksum manifest to the canonical expected manifest in bounded chunks after the exact-size gate, while retaining exact names, lowercase digests, pair identity, and exit-code behavior.
+4. Re-run the complete Task 5 matrix and independent whole-branch review. Do not publish while any Critical or Important finding remains.
+
+---
+
 ### Task 6: Publish PR, merge, tag, and verify GitHub Release
 
 **Files:**
