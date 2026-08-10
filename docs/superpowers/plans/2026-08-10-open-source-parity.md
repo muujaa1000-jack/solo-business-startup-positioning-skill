@@ -454,6 +454,22 @@ If review reports no Critical or Important finding, proceed without another comm
 
 ---
 
+### Task 5B: Close final re-review gaps
+
+**Files:**
+- Modify: `README.md`, `README.zh-CN.md`, `scripts/validate.py`, `scripts/verify_artifacts.py`
+- Modify: `tests/test_repository_contract.py`, `tests/test_packaging.py`
+
+**Required RED-GREEN slices:**
+
+1. Add bilingual evidence-boundary tests that reject completed-release wording before remote proof; state that the workflow is configured to publish the three assets and update completion wording only after Release verification.
+2. Add privacy regressions for `OPENAI_API_KEY`, `CLIENT_SECRET`, `AWS_SECRET_ACCESS_KEY`, and `ACCESS_TOKEN`, then recognize full prefixed secret variable names without weakening existing fixtures.
+3. Add a symlink-loop regression and return a structured finding for `RuntimeError` during resolution.
+4. Add an oversized/noncanonical artifact regression; compare canonical size first, then compare/hash untrusted artifacts in chunks instead of repeated whole-file reads.
+5. Re-run the complete Task 5 matrix and independent whole-branch review. Do not publish while any Critical or Important finding remains.
+
+---
+
 ### Task 6: Publish PR, merge, tag, and verify GitHub Release
 
 **Files:**
