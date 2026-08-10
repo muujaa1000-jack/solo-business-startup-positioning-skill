@@ -58,7 +58,9 @@ _WINDOWS_HOME = re.compile(r"(?i)\b[a-z]:[\\/]+users[\\/]+[^\\/\s]+")
 _UNIX_HOME = re.compile(r"(?<![:\w/])/(?:home|users)/[^/\s]+", re.IGNORECASE)
 _LOCAL_PROJECT = re.compile(r"(?i)\b[a-z]:[\\/]+codex[\\/]+")
 _PRIVATE_KEY = re.compile(r"-----BEGIN (?:[A-Z0-9 ]+ )?PRIVATE KEY-----")
-_GITHUB_TOKEN = re.compile(r"\bgh[pousr]_[A-Za-z0-9_]{20,}\b")
+_GITHUB_TOKEN = re.compile(
+    r"\b(?:gh[pousr]_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,})\b"
+)
 _EMBEDDED_SECRET = re.compile(
     r"(?im)\b(?:api[_-]?key|secret|token|password|passwd|access[_-]?key)"
     r"\b\s*[:=]\s*['\"][^'\"\r\n]{8,}['\"]"
@@ -110,17 +112,27 @@ def _text_files(root: Path) -> list[Path]:
 
 def _interface_default_prompt(metadata: str) -> str | None:
     in_interface = False
+    interface_indent = 0
+    direct_child_indent: int | None = None
     for line in metadata.splitlines():
         if not line.strip() or line.lstrip().startswith("#"):
             continue
-        if line == "interface:":
+        interface_match = re.match(r"^([ \t]*)interface:\s*$", line)
+        if interface_match:
             in_interface = True
+            interface_indent = len(interface_match.group(1))
+            direct_child_indent = None
             continue
         if not in_interface:
             continue
-        if not line.startswith((" ", "\t")):
+        indentation = len(line) - len(line.lstrip(" \t"))
+        if indentation <= interface_indent:
             break
-        match = re.match(r"^[ \t]+default_prompt:\s*(.*)$", line)
+        if direct_child_indent is None:
+            direct_child_indent = indentation
+        if indentation != direct_child_indent:
+            continue
+        match = re.match(r"^[ \t]*default_prompt:\s*(.*)$", line)
         if match:
             return match.group(1).strip().strip("'\"")
     return None

@@ -182,6 +182,18 @@ class RepositoryContractTests(unittest.TestCase):
                     mutate(copied_root)
                     self.assert_validator_rejects(copied_root, "default_prompt")
 
+    def test_validator_rejects_nested_metadata_default_prompt_decoy(self) -> None:
+        temporary, copied_root = self.copied_repository()
+        with temporary:
+            (copied_root / "agents/openai.yaml").write_text(
+                "interface:\n"
+                "  other:\n"
+                "    default_prompt: \"$interview-solo-business-startup-positioning\"\n"
+                "  default_prompt: \"Start the interview.\"\n",
+                encoding="utf-8",
+            )
+            self.assert_validator_rejects(copied_root, "default_prompt")
+
     def test_validator_rejects_remaining_eval_defects(self) -> None:
         cases = [
             ("duplicate id", self.duplicate_eval_id, "ids must be unique"),
@@ -304,6 +316,17 @@ class RepositoryContractTests(unittest.TestCase):
                         encoding="utf-8",
                     )
                     self.assert_validator_rejects(copied_root, expected)
+
+    def test_validator_detects_fine_grained_github_token(self) -> None:
+        temporary, copied_root = self.copied_repository()
+        with temporary:
+            readme = copied_root / "README.md"
+            token = "github" + "_pat_" + ("A" * 40)
+            readme.write_text(
+                readme.read_text(encoding="utf-8") + "\n" + token,
+                encoding="utf-8",
+            )
+            self.assert_validator_rejects(copied_root, "GitHub token")
 
     def test_public_project_files_exist(self) -> None:
         required = {
