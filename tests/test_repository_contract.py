@@ -489,3 +489,81 @@ class RepositoryContractTests(unittest.TestCase):
             security,
         )
         self.assertIn("## [0.1.0] - 2026-08-10", changelog)
+
+    def test_source_hygiene(self) -> None:
+        attributes_path = ROOT / ".gitattributes"
+        self.assertTrue(attributes_path.is_file(), ".gitattributes must exist")
+        attributes = attributes_path.read_text(encoding="utf-8")
+        self.assertEqual(
+            ["* text=auto eol=lf", "*.zip binary", "*.skill binary"],
+            attributes.splitlines(),
+        )
+
+        ignored = (ROOT / ".gitignore").read_text(encoding="utf-8").splitlines()
+        required_ignores = {
+            "dist/", ".worktrees/", "work/", "output/", "outputs/",
+            "cache/", "caches/", ".venv/", "venv/", "__pycache__/",
+            "*.py[cod]", ".pytest_cache/", ".coverage", ".DS_Store",
+            ".idea/", ".vscode/", "*.swp", "*~",
+        }
+        self.assertTrue(required_ignores.issubset(ignored), required_ignores - set(ignored))
+        self.assertFalse((ROOT / "SHA256SUMS").exists())
+        self.assertFalse(
+            (ROOT / "dist/interview-solo-business-startup-positioning.zip").exists()
+        )
+
+    def test_ci_and_release_workflows_are_pinned_and_complete(self) -> None:
+        ci_path = ROOT / ".github/workflows/ci.yml"
+        release_path = ROOT / ".github/workflows/release.yml"
+        self.assertTrue(ci_path.is_file(), "CI workflow must exist")
+        self.assertTrue(release_path.is_file(), "release workflow must exist")
+        workflows = {
+            "ci": ci_path.read_text(encoding="utf-8"),
+            "release": release_path.read_text(encoding="utf-8"),
+        }
+        ci = workflows["ci"]
+        release = workflows["release"]
+
+        self.assertRegex(ci, r"push:\s*\n\s*branches: \[main\]")
+        self.assertRegex(ci, r"(?m)^\s*pull_request:\s*$")
+        for version in ("3.10", "3.12", "3.14"):
+            self.assertIn(f'"{version}"', ci)
+        for command in (
+            'python -m unittest discover -s tests -p "test_*.py" -v',
+            "python scripts/validate.py",
+            "python scripts/package.py --output-dir work/build-one",
+            "python scripts/package.py --output-dir work/build-two",
+            "work/build-one",
+            "work/build-two",
+            "retention-days: 7",
+        ):
+            self.assertIn(command, ci)
+        self.assertEqual(3, ci.count("cmp --silent"))
+        self.assertGreaterEqual(ci.count("python scripts/verify_artifacts.py"), 2)
+        self.assertIn("SHA256SUMS", ci)
+
+        self.assertRegex(release, r"tags:\s*\n\s*- \"v\*\"")
+        self.assertRegex(release, r"permissions:\s*\n\s*contents: write")
+        for command in (
+            'python -m unittest discover -s tests -p "test_*.py" -v',
+            "python scripts/validate.py",
+            "python scripts/package.py",
+            "python scripts/verify_artifacts.py",
+            "GITHUB_REF_NAME",
+            "VERSION",
+            "gh release create",
+            "gh release upload",
+            "--clobber",
+            "SHA256SUMS",
+        ):
+            self.assertIn(command, release)
+
+        for name, workflow in workflows.items():
+            with self.subTest(workflow=name):
+                uses_lines = re.findall(r"(?m)^\s*uses:\s*(.+)$", workflow)
+                self.assertTrue(uses_lines)
+                for uses in uses_lines:
+                    self.assertRegex(
+                        uses,
+                        r"^[^\s@]+@[0-9a-f]{40}(?:\s+#.*)?$",
+                    )
