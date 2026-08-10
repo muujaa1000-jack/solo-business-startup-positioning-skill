@@ -1,59 +1,131 @@
-# 一人公司起步定位访谈
+# Solo Business Startup Positioning Interview
 
-这是一个帮助普通人从零梳理一人公司方向的Codex Skill。它不会先要求你准备商业计划，而是通过一次只问一个问题的访谈，从真实经历、能力、资源、兴趣、约束和可触达人群中寻找起步定位。
+`interview-solo-business-startup-positioning` is an Agent Skill for a person
+who needs to form and compare possible directions for a solo business,
+independent project, or side business before commercial validation.
 
-## 适合谁
+It uses a one-question-at-a-time interview to turn lived experience,
+capabilities, resources, interests, constraints, and reachable people into two
+or three positioning hypotheses. It does not replace commercial validation.
 
-适合完全没有方向、方向太多难以选择，或者知道自己会什么但说不清客户、问题和产品的人。
+The Chinese mirror, [README.zh-CN.md](README.zh-CN.md), covers the same
+user-facing scope, including guidance corresponding to `适合谁`, `如何开始`,
+`会得到什么`, and `能力边界`. Its core interview rule is `一次只问一个问题`,
+and its next stage is `商业化验证`.
 
-如果你已经有明确项目，只想判断是否值得继续投入，请改用一人公司商业化验证Skill。
+## Who it is for
 
-## 如何开始
+Use this Skill when you have no direction, too many directions, or a vague
+direction that needs formation and comparison. If you already have a clear
+project and need to test demand, payment, acquisition, or delivery economics,
+use [solo-business-validation-skill](https://github.com/muujaa1000-jack/solo-business-validation-skill)
+instead.
 
-告诉Codex：
+## Install
 
-> 请用一人公司起步定位访谈，一次问我一个问题，帮我找到可以优先验证的一人公司方向。
+Install this repository using the mechanism provided by your Agent Skills host.
+The repository root is the Skill directory; its invocation name and frontmatter
+name are both `interview-solo-business-startup-positioning`.
 
-也可以直接调用：
+For host-specific installation, consult the host's own documentation. This
+repository contains a standard `SKILL.md` and supporting references; it does
+not claim that installation or runtime behavior has been verified on every
+host.
+
+## Start an interview
+
+Ask your host to use the Skill, for example:
+
+```text
+Use the solo-business startup positioning interview. Ask one question at a time
+and help me find a direction to validate first.
+```
+
+You can also invoke it by name where your host supports named Skills:
 
 ```text
 $interview-solo-business-startup-positioning
 ```
 
-## 安装
+## What the interview produces
 
-让Codex安装本仓库：
+- A bounded view of experience, capabilities, resources, interests, reachable
+  people, and constraints.
+- Two or three candidate positioning hypotheses to compare.
+- An explicit user choice to select, combine, or retain candidates.
+- A seven-section final handoff, including a card for the next validation
+  stage.
+
+See the [complete fictional positioning example](examples/complete-positioning.md)
+and the [insufficient-evidence example](examples/insufficient-evidence.zh-CN.md).
+Public fresh-context prompts and their review method are in the
+[evaluation cases](evals/README.md). These are written examples and static
+evaluation specifications, not proof of model behavior.
+
+## Commercialization validator
+
+The handoff card is a `待验证假设` (hypothesis to validate), not proof of a
+market. Pass it to [solo-business-validation-skill](https://github.com/muujaa1000-jack/solo-business-validation-skill)
+to test demand, payment, acquisition, and delivery economics. This Skill does
+not approve full development, outreach, publication, charging, or spending.
+
+## Compatibility and verification
+
+The repository follows the public Agent Skills directory pattern: `SKILL.md`,
+an optional `agents/` metadata file, and referenced instructions. It is
+intended for Codex, Claude Code, and other hosts that choose to interpret this
+pattern. Directory-level similarity is not a claim of live installation,
+model behavior, or compatibility for any particular host or version.
+
+Read the current host guidance before installation: [Codex Skills](https://developers.openai.com/codex/skills/),
+[Claude Code](https://docs.anthropic.com/en/docs/claude-code), and the
+[Agent Skills specification](https://agentskills.io/specification).
+
+Static repository contracts can be run with:
 
 ```text
-使用 $skill-installer 安装 https://github.com/muujaa1000-jack/solo-business-startup-positioning-skill
+python -X utf8 -m unittest discover -s tests -p "test_*.py" -v
 ```
 
-仓库根目录就是标准Skill目录，名称和frontmatter中的`name`均为`interview-solo-business-startup-positioning`。
+Those contracts check written rules and repository artifacts only. Dated model
+and host observations, when available, belong in `docs/validation.md`; they do
+not prove multi-turn stability, cross-model behavior, or commercial outcomes.
 
-## 会得到什么
+## Evidence boundaries
 
-- 对经历、能力、资源、兴趣、可触达人群和现实约束的整理；
-- 两到三个可以比较的候选定位；
-- 身份、客户、问题、价值、产品、收费、获客、交付和内容定位；
-- 由你确认的定位选择；
-- 可以直接交给商业化验证器的定位交接卡。
+The five information states are `材料已核实`, `用户陈述`, `外部推断`,
+`待验证假设`, and `未知`. The Skill must not invent customers, market demand,
+prices, channels, results, or personal advantages. A completed positioning
+interview is not market validation and does not promise income or fit.
 
-## 能力边界
+## Develop and release
 
-输出是`待验证假设`，不等于市场需求已经得到证明，也不承诺一定赚钱。Skill不会替你编造优势、客户、价格或需求，也不会替你联系客户、发布内容、收费或花钱。
+Contributions should preserve the first-turn single-question contract, the five
+information states, the candidate-decision paths, and the seven-section final
+handoff. Add or update a contract or evaluation before changing behavior. See
+[CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md), and
+[CHANGELOG.md](CHANGELOG.md). The current source version is in [VERSION](VERSION).
 
-定位形成后，如果需要判断需求、付款、获客和交付经济性，请继续使用[一人公司商业化验证Skill](https://github.com/muujaa1000-jack/solo-business-validation-skill)。
+Build the deterministic release artifacts and verify them against a fresh
+canonical build from the source files:
 
-## 验证
-
-本仓库包含文本契约测试和完整的[验证记录](docs/validation.md)：
-
-```bash
-python -m unittest discover -s tests -p "test_*.py" -v
+```text
+python -X utf8 scripts/package.py --output-dir dist
+python -X utf8 scripts/verify_artifacts.py dist/interview-solo-business-startup-positioning-0.1.0.zip dist/interview-solo-business-startup-positioning-0.1.0.skill
 ```
 
-验证记录中的行为证据只覆盖所列首轮场景，不证明完整多轮访谈、跨模型稳定性或真实商业需求。
+### Release artifacts
 
-## 许可证
+The release workflow is configured to publish exactly these three assets for
+`v0.1.0`:
+
+- `interview-solo-business-startup-positioning-0.1.0.zip`
+- `interview-solo-business-startup-positioning-0.1.0.skill`
+- `SHA256SUMS`
+
+Do not describe the Release as complete until the remote GitHub Release and
+all three downloaded assets have been verified.
+
+## License
 
 [MIT](LICENSE)

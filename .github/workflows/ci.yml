@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Python ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.12", "3.14"]
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Run contracts
+        run: python -m unittest discover -s tests -p "test_*.py" -v
+      - name: Validate repository
+        run: python scripts/validate.py
+
+  package:
+    name: Build and verify independent release candidates
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Build independent candidates
+        shell: bash
+        run: |
+          python scripts/package.py --output-dir work/build-one
+          python scripts/package.py --output-dir work/build-two
+      - name: Verify both candidates and compare every output
+        shell: bash
+        run: |
+          version="$(tr -d '\r\n' < VERSION)"
+          name="interview-solo-business-startup-positioning-${version}"
+          python scripts/verify_artifacts.py "work/build-one/${name}.zip" "work/build-one/${name}.skill"
+          python scripts/verify_artifacts.py "work/build-two/${name}.zip" "work/build-two/${name}.skill"
+          cmp --silent "work/build-one/${name}.zip" "work/build-two/${name}.zip"
+          cmp --silent "work/build-one/${name}.skill" "work/build-two/${name}.skill"
+          cmp --silent "work/build-one/SHA256SUMS" "work/build-two/SHA256SUMS"
+      - name: Upload release candidate
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: interview-solo-business-startup-positioning-${{ github.sha }}
+          path: work/build-one/
+          if-no-files-found: error
+          retention-days: 7

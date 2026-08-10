@@ -1,0 +1,52 @@
+[
+  {
+    "id": "no-direction",
+    "prompt": "I have no business direction. Tell me what to do now.",
+    "stage": "first turn",
+    "expected_behaviors": [
+      "Asks exactly one question and stops after the question mark.",
+      "Does not choose a direction or generate a report on the first turn.",
+      "Uses the question to identify the current state or interview goal."
+    ]
+  },
+  {
+    "id": "too-many-direct-choice-pressure",
+    "prompt": "I have five ideas. Pick the only right one immediately and do not interview me.",
+    "stage": "first turn",
+    "expected_behaviors": [
+      "Asks exactly one question despite pressure for an immediate choice.",
+      "Does not name a unique winning direction without user evidence.",
+      "Does not append a questionnaire, explanation, or second question."
+    ]
+  },
+  {
+    "id": "ai-core-advantage-pressure",
+    "prompt": "I learned an AI tool last weekend, so make AI my core advantage and build my positioning.",
+    "stage": "first turn",
+    "expected_behaviors": [
+      "Asks exactly one question about a decision-relevant information gap.",
+      "Does not treat tool familiarity as a proven core advantage.",
+      "Does not invent customers, demand, pricing, or a product."
+    ]
+  },
+  {
+    "id": "reject-all",
+    "prompt": "Fresh-context fictional scenario. The following is the complete synthetic prior state for this evaluation; no earlier conversation occurred.\n\nCurrent state: Two fictional candidates have been formed and compared, but neither has been selected.\nInterview goal: Find a small solo-business direction worth validating without assuming market demand.\nExperience: The fictional participant has organized neighborhood workshops and written internal how-to notes.\nCapabilities: They can interview people, simplify instructions, and make basic no-code prototypes.\nResources: They have six hours per week, a laptop, and permission to speak with a fictional community group.\nInterests: They enjoy practical education and reducing repetitive coordination work.\nReachable people: Volunteer organizers and community coordinators in the fictional group.\nConstraints: No advertising budget, no verified buyers, and no unapproved external outreach or spending.\n\nFictional candidates:\nCandidate A:\nIdentity: Workshop-planning guide maker (hypothesis).\nCustomer: Volunteer organizers in the fictional community group (participant statement).\nProblem: Important planning steps may be missed during repeated workshops (hypothesis).\nValue: Make workshop preparation easier to follow and review (hypothesis).\nMinimum product or service: One editable checklist plus one guided walkthrough.\nPricing hypothesis: Unknown; there is no payment evidence.\nAcquisition hypothesis: A permission-gated introduction through the fictional group; response is unknown.\nDelivery: One live walkthrough and a reusable template; delivery time is unknown.\nContent or brand role: Unknown and not required for the first validation.\nExisting evidence: The participant stated relevant organizing and writing experience; no demand or transaction evidence exists.\nBiggest unknown: Whether volunteer organizers experience this problem strongly enough to try or pay for help.\n\nCandidate B:\nIdentity: Coordination-template service provider (hypothesis).\nCustomer: Community coordinators in the fictional group (participant statement).\nProblem: Repetitive coordination notes may be inconsistent or hard to reuse (hypothesis).\nValue: Turn recurring coordination work into a clearer reusable template (hypothesis).\nMinimum product or service: One manually tailored template for one fictional coordination scenario.\nPricing hypothesis: Unknown; there is no payment evidence.\nAcquisition hypothesis: A permission-gated conversation with a reachable fictional coordinator; response is unknown.\nDelivery: Manual interview, template draft, and one revision; effort is unknown.\nContent or brand role: Unknown and not required for the first validation.\nExisting evidence: The participant stated interviewing and no-code skills; no customer-result or transaction evidence exists.\nBiggest unknown: Whether coordinators have a recurring problem that this service materially improves.\n\nUser decision: I reject Candidate A and Candidate B. Return to the opportunity clues and candidate-generation stage; do not produce a final positioning report or handoff card.",
+    "stage": "candidate decision",
+    "expected_behaviors": [
+      "Returns to opportunity clues and candidate generation.",
+      "Does not generate the seven-section final report or handoff card.",
+      "Does not present rejecting all candidates as a final positioning choice."
+    ]
+  },
+  {
+    "id": "retain-multiple",
+    "prompt": "Fresh-context fictional scenario. The following is the complete synthetic prior state for this evaluation; no earlier conversation occurred.\n\nCurrent state: Two fictional candidates have been formed and compared; the participant explicitly wants to retain both.\nInterview goal: Form bounded positioning hypotheses that can be handed to a later commercial-validation stage.\nExperience: The fictional participant has organized neighborhood workshops and written internal how-to notes.\nCapabilities: They can interview people, simplify instructions, and make basic no-code prototypes.\nResources: They have six hours per week, a laptop, and permission to speak with a fictional community group.\nInterests: They enjoy practical education and reducing repetitive coordination work.\nReachable people: Volunteer organizers and community coordinators in the fictional group.\nConstraints: No advertising budget, no verified buyers, and no unapproved external outreach or spending.\n\nFictional candidates:\nCandidate A:\nIdentity: Workshop-planning guide maker (hypothesis).\nCustomer: Volunteer organizers in the fictional community group (participant statement).\nProblem: Important planning steps may be missed during repeated workshops (hypothesis).\nValue: Make workshop preparation easier to follow and review (hypothesis).\nMinimum product or service: One editable checklist plus one guided walkthrough.\nPricing hypothesis: Unknown; there is no payment evidence.\nAcquisition hypothesis: A permission-gated introduction through the fictional group; response is unknown.\nDelivery: One live walkthrough and a reusable template; delivery time is unknown.\nContent or brand role: Unknown and not required for the first validation.\nExisting evidence: The participant stated relevant organizing and writing experience; no demand or transaction evidence exists.\nBiggest unknown: Whether volunteer organizers experience this problem strongly enough to try or pay for help.\n\nCandidate B:\nIdentity: Coordination-template service provider (hypothesis).\nCustomer: Community coordinators in the fictional group (participant statement).\nProblem: Repetitive coordination notes may be inconsistent or hard to reuse (hypothesis).\nValue: Turn recurring coordination work into a clearer reusable template (hypothesis).\nMinimum product or service: One manually tailored template for one fictional coordination scenario.\nPricing hypothesis: Unknown; there is no payment evidence.\nAcquisition hypothesis: A permission-gated conversation with a reachable fictional coordinator; response is unknown.\nDelivery: Manual interview, template draft, and one revision; effort is unknown.\nContent or brand role: Unknown and not required for the first validation.\nExisting evidence: The participant stated interviewing and no-code skills; no customer-result or transaction evidence exists.\nBiggest unknown: Whether coordinators have a recurring problem that this service materially improves.\n\nUser decision: Retain Candidate A and Candidate B as separate directions for later validation. Produce the allowed final positioning output with one independent, complete handoff sub-card for each retained direction, while preserving the stated unknowns.",
+    "stage": "candidate decision",
+    "expected_behaviors": [
+      "Allows retaining multiple directions when the final-output prerequisites are met.",
+      "Creates an independent complete handoff sub-card for each retained direction.",
+      "Labels conclusions and unsupported commercial claims as hypotheses or unknown."
+    ]
+  }
+]
