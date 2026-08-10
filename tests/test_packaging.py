@@ -71,18 +71,40 @@ class PackagingTests(unittest.TestCase):
         return temporary, copied_root, zip_path, skill_path, sums_path
 
     def write_archive(
-        self, path: Path, source_root: Path, changed: dict[str, bytes] | None = None
+        self,
+        path: Path,
+        source_root: Path,
+        changed: dict[str, bytes] | None = None,
+        members: list[str] | None = None,
     ) -> None:
         from scripts.verify_artifacts import expected_members
         from scripts.validate import normalized_runtime_bytes
 
         changed = changed or {}
         with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as archive:
-            for member in expected_members():
+            for member in members or expected_members():
                 relative = member.split("/", 1)[1]
                 archive.writestr(
                     member, changed.get(relative, normalized_runtime_bytes(source_root, relative))
                 )
+
+    def replace_release_pair(
+        self,
+        source_root: Path,
+        zip_path: Path,
+        skill_path: Path,
+        sums_path: Path,
+        changed: dict[str, bytes] | None = None,
+        members: list[str] | None = None,
+    ) -> None:
+        self.write_archive(zip_path, source_root, changed, members)
+        shutil.copyfile(zip_path, skill_path)
+        digest = hashlib.sha256(zip_path.read_bytes()).hexdigest()
+        sums_path.write_text(
+            f"{digest}  {zip_path.name}\n{digest}  {skill_path.name}\n",
+            encoding="ascii",
+            newline="\n",
+        )
 
     def test_builds_are_byte_identical_and_whitelisted(self) -> None:
         from scripts.package import FIXED_ZIP_TIMESTAMP, build
@@ -237,6 +259,82 @@ class PackagingTests(unittest.TestCase):
             )
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("[OK] artifact verification passed", result.stdout)
+
+    def test_verifier_cli_rejects_an_arbitrary_or_missing_skill_argument(self) -> None:
+        temporary, _, zip_path, _, _ = self.build_valid_artifacts()
+        with temporary:
+            arbitrary_skill = zip_path.with_name("arbitrary.skill")
+            arbitrary_skill.write_bytes(b"not the release artifact")
+            for skill_path in (arbitrary_skill, zip_path.with_name("missing.skill")):
+                with self.subTest(skill=skill_path.name):
+                    result = subprocess.run(
+                        [
+                            sys.executable,
+                            "-X",
+                            "utf8",
+                            "scripts/verify_artifacts.py",
+                            str(zip_path),
+                            str(skill_path),
+                        ],
+                        cwd=ROOT,
+                        capture_output=True,
+                        text=True,
+                        check=False,
+                    )
+                    self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+                    self.assertIn("[FAIL]", result.stdout)
+
+    def test_verifier_rejects_private_runtime_content_and_missing_member(self) -> None:
+        from scripts.verify_artifacts import expected_members, verify
+
+        temporary, copied_root, zip_path, skill_path, sums_path = self.build_valid_artifacts()
+        with temporary:
+            self.replace_release_pair(
+                copied_root,
+                zip_path,
+                skill_path,
+                sums_path,
+                {"SKILL.md": b"api_key = \"not-a-real-secret\"\n"},
+            )
+            privacy_findings = "\n".join(verify(copied_root, zip_path))
+            self.assertIn("embedded secret", privacy_findings)
+
+            self.replace_release_pair(
+                copied_root,
+                zip_path,
+                skill_path,
+                sums_path,
+                members=expected_members()[:-1],
+            )
+            member_findings = "\n".join(verify(copied_root, zip_path))
+            self.assertIn("ordered runtime whitelist", member_findings)
+
+    def test_verifier_cli_exits_one_when_artifact_has_findings(self) -> None:
+        temporary, copied_root, zip_path, skill_path, sums_path = self.build_valid_artifacts()
+        with temporary:
+            self.replace_release_pair(
+                copied_root,
+                zip_path,
+                skill_path,
+                sums_path,
+                {"LICENSE": b"changed\n"},
+            )
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    "-X",
+                    "utf8",
+                    "scripts/verify_artifacts.py",
+                    str(zip_path),
+                    str(skill_path),
+                ],
+                cwd=ROOT,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("does not match source", result.stdout)
 
 
 if __name__ == "__main__":

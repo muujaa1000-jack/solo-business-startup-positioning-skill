@@ -142,13 +142,30 @@ def main(argv: list[str] | None = None) -> int:
     if len(arguments) != 2:
         print("usage: verify_artifacts.py <artifact.zip> <artifact.skill>", file=sys.stderr)
         return 2
-    artifacts = [Path(argument) for argument in arguments]
+    artifacts = [Path(argument).resolve() for argument in arguments]
     zip_artifacts = [path for path in artifacts if path.suffix == ".zip"]
     skill_artifacts = [path for path in artifacts if path.suffix == ".skill"]
     if len(zip_artifacts) != 1 or len(skill_artifacts) != 1:
         print("usage: verify_artifacts.py <artifact.zip> <artifact.skill>", file=sys.stderr)
         return 2
-    findings = verify(Path(__file__).resolve().parents[1], zip_artifacts[0])
+    root = Path(__file__).resolve().parents[1]
+    version = (root / "VERSION").read_text(encoding="utf-8").strip()
+    zip_path, skill_path = zip_artifacts[0], skill_artifacts[0]
+    expected_zip = f"{SKILL_NAME}-{version}.zip"
+    expected_skill = f"{SKILL_NAME}-{version}.skill"
+    findings: list[str] = []
+    if zip_path.parent != skill_path.parent:
+        findings.append("release pair: ZIP and .skill must be in the same directory")
+    if zip_path.name != expected_zip:
+        findings.append(f"{zip_path.name}: does not use the versioned release name")
+    if skill_path.name != expected_skill:
+        findings.append(f"{skill_path.name}: does not use the versioned release name")
+    if not zip_path.is_file():
+        findings.append(f"{zip_path}: artifact is missing")
+    if not skill_path.is_file():
+        findings.append(f"{skill_path}: artifact is missing")
+    if not findings:
+        findings = verify(root, zip_path)
     if findings:
         for finding in findings:
             print(f"[FAIL] {finding}")
