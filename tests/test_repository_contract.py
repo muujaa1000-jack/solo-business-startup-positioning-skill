@@ -108,6 +108,181 @@ class RepositoryContractTests(unittest.TestCase):
                     mutate(copied_root)
                     self.assert_validator_rejects(copied_root, expected)
 
+    def test_validator_rejects_remaining_frontmatter_and_skill_defects(self) -> None:
+        cases = [
+            (
+                "extra frontmatter key",
+                lambda root: (root / "SKILL.md").write_text(
+                    (root / "SKILL.md").read_text(encoding="utf-8").replace(
+                        "description:", "extra: value\ndescription:", 1
+                    ),
+                    encoding="utf-8",
+                ),
+                "frontmatter keys",
+            ),
+            (
+                "description does not use trigger wording",
+                lambda root: (root / "SKILL.md").write_text(
+                    (root / "SKILL.md").read_text(encoding="utf-8").replace(
+                        "description: Use when", "description: Apply when", 1
+                    ),
+                    encoding="utf-8",
+                ),
+                "description must start",
+            ),
+            (
+                "skill is too long",
+                lambda root: (root / "SKILL.md").write_text(
+                    (root / "SKILL.md").read_text(encoding="utf-8")
+                    + ("extra line\n" * 500),
+                    encoding="utf-8",
+                ),
+                "under 500 lines",
+            ),
+        ]
+        for name, mutate, expected in cases:
+            with self.subTest(name=name):
+                temporary, copied_root = self.copied_repository()
+                with temporary:
+                    mutate(copied_root)
+                    self.assert_validator_rejects(copied_root, expected)
+
+    def test_validator_requires_metadata_default_prompt_invocation(self) -> None:
+        cases = [
+            (
+                "invocation only in comment",
+                lambda root: (root / "agents/openai.yaml").write_text(
+                    "# $interview-solo-business-startup-positioning\n"
+                    "interface:\n"
+                    "  default_prompt: \"Start the interview.\"\n",
+                    encoding="utf-8",
+                ),
+            ),
+            (
+                "invocation only in unrelated field",
+                lambda root: (root / "agents/openai.yaml").write_text(
+                    "interface:\n"
+                    "  note: \"$interview-solo-business-startup-positioning\"\n"
+                    "  default_prompt: \"Start the interview.\"\n",
+                    encoding="utf-8",
+                ),
+            ),
+            (
+                "missing invocation",
+                lambda root: (root / "agents/openai.yaml").write_text(
+                    "interface:\n  default_prompt: \"Start the interview.\"\n",
+                    encoding="utf-8",
+                ),
+            ),
+        ]
+        for name, mutate in cases:
+            with self.subTest(name=name):
+                temporary, copied_root = self.copied_repository()
+                with temporary:
+                    mutate(copied_root)
+                    self.assert_validator_rejects(copied_root, "default_prompt")
+
+    def test_validator_rejects_remaining_eval_defects(self) -> None:
+        cases = [
+            ("duplicate id", self.duplicate_eval_id, "ids must be unique"),
+            ("too few behaviors", self.shorten_behaviors, "at least three"),
+            ("non-string behavior", self.make_behavior_non_string, "nonempty behaviors"),
+            ("blank behavior", self.make_behavior_blank, "nonempty behaviors"),
+            (
+                "malformed json",
+                lambda root: (root / "evals/cases.json").write_text("[", encoding="utf-8"),
+                "invalid JSON",
+            ),
+        ]
+        for name, mutate, expected in cases:
+            with self.subTest(name=name):
+                temporary, copied_root = self.copied_repository()
+                with temporary:
+                    mutate(copied_root)
+                    self.assert_validator_rejects(copied_root, expected)
+
+    def duplicate_eval_id(self, root: Path) -> None:
+        cases = json.loads((root / "evals/cases.json").read_text(encoding="utf-8"))
+        cases[1]["id"] = cases[0]["id"]
+        (root / "evals/cases.json").write_text(json.dumps(cases), encoding="utf-8")
+
+    def shorten_behaviors(self, root: Path) -> None:
+        cases = json.loads((root / "evals/cases.json").read_text(encoding="utf-8"))
+        cases[0]["expected_behaviors"] = cases[0]["expected_behaviors"][:2]
+        (root / "evals/cases.json").write_text(json.dumps(cases), encoding="utf-8")
+
+    def make_behavior_non_string(self, root: Path) -> None:
+        cases = json.loads((root / "evals/cases.json").read_text(encoding="utf-8"))
+        cases[0]["expected_behaviors"][0] = 7
+        (root / "evals/cases.json").write_text(json.dumps(cases), encoding="utf-8")
+
+    def make_behavior_blank(self, root: Path) -> None:
+        cases = json.loads((root / "evals/cases.json").read_text(encoding="utf-8"))
+        cases[0]["expected_behaviors"][0] = "   "
+        (root / "evals/cases.json").write_text(json.dumps(cases), encoding="utf-8")
+
+    def test_validator_requires_official_compatibility_links(self) -> None:
+        links = [
+            "https://developers.openai.com/codex/skills/",
+            "https://docs.anthropic.com/en/docs/claude-code",
+            "https://agentskills.io/specification",
+        ]
+        for link in links:
+            with self.subTest(link=link):
+                temporary, copied_root = self.copied_repository()
+                with temporary:
+                    readme = copied_root / "README.md"
+                    readme.write_text(
+                        readme.read_text(encoding="utf-8").replace(link, ""),
+                        encoding="utf-8",
+                    )
+                    self.assert_validator_rejects(copied_root, "official compatibility")
+
+    def test_validator_detects_windows_slash_paths_and_documentation(self) -> None:
+        cases = [
+            ("windows home with slash", "C:" + "/" + "Users/Ada/secret.txt", "Windows home path"),
+            ("workspace with slash", "D:" + "/codex/project/private.txt", "local project path"),
+            ("documentation path", "D:" + "/codex/project/private.txt", "local project path"),
+        ]
+        for name, private_text, expected in cases:
+            with self.subTest(name=name):
+                temporary, copied_root = self.copied_repository()
+                with temporary:
+                    target = (
+                        copied_root / "docs/validation.md"
+                        if name == "documentation path"
+                        else copied_root / "README.md"
+                    )
+                    target.write_text(
+                        target.read_text(encoding="utf-8") + "\n" + private_text,
+                        encoding="utf-8",
+                    )
+                    self.assert_validator_rejects(copied_root, expected)
+
+    def test_validator_ignores_generated_and_local_tool_directories(self) -> None:
+        ignored_directories = [
+            ".git", "dist", "work", "output", "outputs", "cache", "caches",
+            "__pycache__", ".pytest_cache", ".venv", "venv", ".idea", ".vscode",
+        ]
+        private_text = "D:" + "/codex/project/private.txt"
+        for directory in ignored_directories:
+            with self.subTest(directory=directory):
+                temporary, copied_root = self.copied_repository()
+                with temporary:
+                    target = copied_root / directory / "generated.txt"
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    target.write_text(private_text, encoding="utf-8")
+                    result = self.run_validator(copied_root)
+                    self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_validator_handles_unreadable_required_path_gracefully(self) -> None:
+        temporary, copied_root = self.copied_repository()
+        with temporary:
+            readme = copied_root / "README.md"
+            readme.unlink()
+            readme.mkdir()
+            self.assert_validator_rejects(copied_root, "required file is missing")
+
     def test_validator_detects_private_paths_and_tokens(self) -> None:
         cases = [
             ("windows home", "C:" + r"\Users\Ada\secret.txt", "Windows home path"),

@@ -180,7 +180,7 @@ git commit -m "docs: complete public skill documentation"
 
 - [ ] **Step 1: Add failing validator tests**
 
-Add tests that run the missing CLI with subprocess and assert exit 0, so RED is an assertion failure. Add temporary-copy tests for invalid semver, wrong frontmatter, missing reference links, fewer than five evals, missing eval fields, invalid UTF-8, Windows and Unix home paths, `D:\codex\project\private.txt`, private-key headers, GitHub tokens, and embedded secrets.
+Add tests that run the missing CLI with subprocess and assert exit 0, so RED is an assertion failure. Add temporary-copy tests for invalid semver, wrong frontmatter, missing reference links, fewer than five evals, missing eval fields, invalid UTF-8, Windows and Unix home paths, a machine-specific Windows workspace path, private-key headers, GitHub tokens, and embedded secrets.
 
 - [ ] **Step 2: Run RED**
 
@@ -421,7 +421,7 @@ Compare both build directories byte-for-byte. Extract ZIP and `.skill` into sepa
 
 - [ ] **Step 2: Audit public safety**
 
-Scan tracked text for private keys, GitHub tokens, embedded secrets, user-home paths, `D:\codex\Dialogue`, email addresses, phone numbers, and identifying operating evidence. Read every match manually; no unsafe match is allowed.
+Scan tracked text for private keys, GitHub tokens, embedded secrets, user-home paths, machine-specific workspace paths, email addresses, phone numbers, and identifying operating evidence. Read every match manually; no unsafe match is allowed.
 
 - [ ] **Step 3: Request whole-branch review**
 

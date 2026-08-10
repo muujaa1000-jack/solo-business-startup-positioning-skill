@@ -376,7 +376,7 @@ GREEN：再次运行同一条目标测试，退出状态 0；1 项通过、0 项
 
 - 命令：`python -m unittest discover -s tests/skills -p "test_*.py" -v`
 - 结果：退出状态 0；20 项通过、0 项失败（本 Skill 14 项，既有传统经营者定位 Skill 6 项）。
-- 命令：`PYTHONUTF8=1 python C:/Users/Admin/.codex/skills/.system/skill-creator/scripts/quick_validate.py skills/interview-solo-business-startup-positioning`
+- 命令：`PYTHONUTF8=1 python <skill-creator-path>/scripts/quick_validate.py skills/interview-solo-business-startup-positioning`
 - 结果：退出状态 0；官方校验输出：`Skill is valid!`。
 
 ### ZIP 内容与解压校验
@@ -391,7 +391,7 @@ GREEN：再次运行同一条目标测试，退出状态 0；1 项通过、0 项
   - `interview-solo-business-startup-positioning/references/interview-guide.md`
   - `interview-solo-business-startup-positioning/references/output-contract.md`
 - 解压目录：`out/skill-validation/interview-solo-business-startup-positioning/interview-solo-business-startup-positioning`。
-- 命令：`PYTHONUTF8=1 python C:/Users/Admin/.codex/skills/.system/skill-creator/scripts/quick_validate.py <解压目录>`
+- 命令：`PYTHONUTF8=1 python <skill-creator-path>/scripts/quick_validate.py <解压目录>`
 - 结果：退出状态 0；官方校验输出：`Skill is valid!`。
 
 ### 源文件与解压文件 SHA-256 比较
@@ -426,7 +426,7 @@ GREEN：再次运行同一条目标测试，退出状态 0；1 项通过、0 项
 ### 新鲜完整验证
 
 - `python -m unittest discover -s tests/skills -p "test_*.py" -v`：退出状态 0，21 项通过、0 项失败（本 Skill 15 项，既有传统经营者定位 Skill 6 项）。
-- `PYTHONUTF8=1 python C:/Users/Admin/.codex/skills/.system/skill-creator/scripts/quick_validate.py skills/interview-solo-business-startup-positioning`：退出状态 0，输出`Skill is valid!`。
+- `PYTHONUTF8=1 python <skill-creator-path>/scripts/quick_validate.py skills/interview-solo-business-startup-positioning`：退出状态 0，输出`Skill is valid!`。
 
 ### 重建 ZIP 与解压复验
 
@@ -515,7 +515,7 @@ GREEN：再次运行同一条目标测试，退出状态 0；1 项通过、0 项
 ### 新鲜测试、结构校验与源提交
 
 - `python -m unittest discover -s tests/skills -p "test_*.py" -v`：退出状态 0，31 项通过、0 项失败（本 Skill 25 项，既有传统经营者定位 Skill 6 项）。
-- `PYTHONUTF8=1 python C:/Users/Admin/.codex/skills/.system/skill-creator/scripts/quick_validate.py skills/interview-solo-business-startup-positioning`：退出状态 0，输出`Skill is valid!`。
+- `PYTHONUTF8=1 python <skill-creator-path>/scripts/quick_validate.py skills/interview-solo-business-startup-positioning`：退出状态 0，输出`Skill is valid!`。
 - 占位符扫描：`NO_PLACEHOLDER_MATCHES`。
 - 源、测试和实施计划提交：`9f61e847822f2146de30c386dfcb164214bb6da6`（`fix: tighten positioning interview contracts`）。
 
