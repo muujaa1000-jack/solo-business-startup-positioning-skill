@@ -382,7 +382,11 @@ class PackagingTests(unittest.TestCase):
 
         temporary, copied_root, zip_path, _, _ = self.build_valid_artifacts()
         with temporary:
-            for index, unsafe_name in enumerate(unsafe_names):
+            # Python 3.10's zipfile rejects an empty member name before it can
+            # be written. The predicate contract above covers that case;
+            # archive-level tests use the dangerous names every supported
+            # stdlib can construct.
+            for index, unsafe_name in enumerate(unsafe_names[1:]):
                 with self.subTest(member=unsafe_name):
                     hostile = zip_path.with_name(f"hostile-{index}.zip")
                     self.write_archive(hostile, copied_root)
