@@ -435,6 +435,25 @@ If review reports no Critical or Important finding, proceed without another comm
 
 ---
 
+### Task 5A: Fix whole-branch review findings
+
+**Files:**
+- Modify: `evals/cases.json`, `evals/README.md`, `README.md`, `README.zh-CN.md`
+- Modify: `scripts/validate.py`, `scripts/verify_artifacts.py`
+- Modify: `.github/workflows/release.yml`
+- Modify: `tests/test_repository_contract.py`, `tests/test_packaging.py`
+
+**Required RED-GREEN slices:**
+
+1. Add repository-contract tests proving `reject-all` and `retain-multiple` each carry a complete fictional prior interview/candidate state in their own prompt; then update the two cases and evaluation instructions.
+2. Add temporary-repository tests that reject symlinked required/runtime files, resolved paths outside the repository, `/root/...`, `~/...`, and unquoted `api_key=...`; then harden validation without adding dependencies.
+3. Add hostile archive tests for ZIP comments, member comments, and extra fields; then make artifact verification regenerate canonical bytes from source and require byte identity.
+4. Add workflow-contract tests that require an existing release to have exactly the three expected asset names before and after upload; then add fail-closed remote asset-set checks.
+5. Add bilingual README contracts for linked examples/evals, the exact three Release assets, deterministic package and artifact-verification commands; then update both mirrors in the same order without expanding compatibility claims.
+6. Run the focused tests after each RED, then the entire Task 5 matrix, public-safety audit, and a new independent whole-branch review. Do not proceed to Task 6 while any Critical or Important finding remains.
+
+---
+
 ### Task 6: Publish PR, merge, tag, and verify GitHub Release
 
 **Files:**
